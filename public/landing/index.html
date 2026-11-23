@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="en" data-type="software" data-radius="soft" data-ground="sage" data-buttons="solid" data-motion>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LostLink: Campus lost and found for DLSAU</title>
+  <meta name="description"
+    content="Report lost or found items across 17 DLSAU buildings, verify ownership proof, and claim items at Life Science Building Room 102.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="LostLink: Campus lost and found for DLSAU">
+  <meta property="og:description"
+    content="Report lost or found items across 17 DLSAU buildings and claim verified property at LSB Room 102.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/img/lostlink-badge.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#f6f7f2">
+  <meta name="site-kind" content="software">
+  <meta name="page-type" content="software">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..700&family=DM+Mono:wght@400;500&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet">
+  </noscript>
+  <link rel="stylesheet" href="assets/system.css">
+  <link rel="stylesheet" href="assets/ui/cards.css">
+  <link rel="stylesheet" href="assets/motion/motion.css">
+  <link rel="stylesheet" href="assets/backgrounds/backgrounds.css">
+  <link rel="stylesheet" href="assets/layout/layout.css">
+  <link rel="stylesheet" href="assets/icons/icon.css">
+  <link rel="stylesheet" href="assets/moments/word-highlight/moment.css">
+  <style>
+    :root {
+      --p-bg: #f6f7f2;
+      --p-surface: #ecefe7;
+      --p-ink: #0a0a0a;
+      --p-muted: #454545;
+      --p-accent: #1f6b3a;
+      --p-accent-ink: #ffffff;
+      --p-action: #1f6b3a;
+      --p-action-ink: #ffffff;
+      --p-inv-bg: #0a0a0a;
+      --p-inv-surface: #171717;
+      --p-inv-ink: #f6f7f2;
+      --p-inv-muted: #a3a3a3;
+      --p-inv-accent: #daef8a;
+      --p-inv-accent-ink: #0a0a0a;
+      --p-inv-action: #daef8a;
+      --p-inv-action-ink: #0a0a0a;
+      --font-display: "Outfit", system-ui, sans-serif;
+      --font-text: "Outfit", system-ui, sans-serif;
+      --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      --display-weight: 400;
+      --display-tracking: -0.03em;
+      --display-tracking-xl: -0.04em;
+    }
+  </style>
+  <link rel="stylesheet" href="assets/ui/base.css">
+  <link rel="stylesheet" href="assets/ui/window/fragment.css">
+  <link rel="stylesheet" href="assets/ui/doc/fragment.css">
+  <link rel="stylesheet" href="assets/ui/search/fragment.css">
+  <link rel="stylesheet" href="assets/ui/notify/fragment.css">
+  <link rel="stylesheet" href="assets/ui/checklist/fragment.css">
+  <script>document.documentElement.classList.add('m-enter'); setTimeout(() => document.documentElement.classList.add('m-enter-done'), 700)</script>
+  <script src="assets/backgrounds/backgrounds.js"></script>
+  <script>document.documentElement.classList.add('mo-js'); setTimeout(() => document.documentElement.classList.add('mo-safe'), 2500)</script>
+  <link rel="modulepreload" href="assets/moments/moments.js">
+  <link rel="modulepreload" href="assets/moments/lib.js">
+  <link rel="modulepreload" href="assets/moments/word-highlight/moment.js">
+  <style>
+    @media (min-width: 1024px) {
+      .nav--centre .nav__bar {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: var(--s-5);
+      }
+    }
+
+    .nav__dlsau {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding-left: 12px;
+      border-left: 1px solid var(--line);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
+    .nav__dlsau:hover {
+      color: var(--ink);
+    }
+
+    .nav__dlsau img {
+      width: 42px;
+      height: 42px;
+      display: block;
+      flex: none;
+    }
+
+    @media (max-width: 1279px) {
+      .nav__dlsau-name {
+        display: none;
+      }
+    }
+
+    @media (max-width: 1023px) {
+      .nav__dlsau {
+        border-left: 0;
+        padding-left: 0;
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 639px) {
+      .nav__logo img,
+      .nav__dlsau img {
+        width: 34px;
+        height: 34px;
+      }
+    }
+
+    .nav__logo {
+      font-size: 24px !important;
+      font-weight: 600 !important;
+      gap: 10px !important;
+    }
+
+    .nav__logo img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      flex: none;
+    }
+
+    .hero__window {
+      background: radial-gradient(85% 65% at 15% 15%, #dce3d6 0, transparent 70%), radial-gradient(75% 55% at 85% 85%, #a7c4ad 0, transparent 70%), #cdd6c6;
+    }
+
+    .hero__window .ui-win {
+      width: 100%;
+      border: 0;
+      border-radius: 12px 12px 0 0;
+    }
+
+    .app.ui {
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      margin-top: var(--s-7);
+      background: var(--u-bg);
+      border: 1px solid var(--u-border);
+      border-radius: var(--u-r);
+      box-shadow: var(--u-shadow);
+    }
+
+    .app>.app__pane {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .app>.app__pane+.app__pane {
+      border-left: 1px solid var(--u-line);
+    }
+
+    .app>.app__pane>.ui-panel,
+    .app>.app__pane>.ui-doc {
+      width: 100%;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .app>.app__pane::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 56px;
+      background: linear-gradient(transparent, var(--u-bg));
+      pointer-events: none;
+    }
+
+    #features .panel {
+      --p-h: 300px;
+    }
+
+    .statement > .wrap {
+      justify-content: space-between;
+      gap: var(--s-7);
+    }
+
+    .custody-strip {
+      border-top: 1px solid var(--line);
+      padding-top: var(--s-5);
+    }
+
+    .custody-strip__col {
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .custody-strip__col h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .custody-strip__col p {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .custody-strip__meta {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent);
+    }
+
+    #faq,
+    #faq > .wrap {
+      height: auto;
+    }
+
+    .item-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      object-fit: cover;
+      flex: none;
+    }
+
+    @media (min-width: 1024px) and (max-width: 1279px) {
+      .app.ui {
+        grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+      }
+    }
+
+    @media (max-width: 1023px) {
+      .app.ui {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .app>.app__pane--list {
+        max-height: 248px;
+      }
+
+      .app>.app__pane--list::after {
+        display: none;
+      }
+
+      .app .ui-win__side {
+        display: none;
+      }
+
+      .app .ui-win__body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .app>.app__pane+.app__pane {
+        border-left: 0;
+        border-top: 1px solid var(--u-line);
+      }
+    }
+
+    @media (max-width: 639px) {
+      .app.ui {
+        grid-template-rows: minmax(0, 1fr);
+      }
+
+      .app>.app__pane--list {
+        display: none;
+      }
+
+      .app>.app__pane+.app__pane {
+        border-top: 0;
+      }
+
+      #features {
+        --section-band: var(--s-8);
+      }
+
+      #features .grid {
+        gap: var(--s-4);
+      }
+
+      #features .card--row {
+        gap: var(--s-2);
+      }
+
+      #features .panel {
+        --p-h: 132px;
+      }
+
+      .faq-photo {
+        height: auto;
+      }
+    }
+
+    .campus-bp {
+      background: #134e3a;
+      color: #ffffff;
+      border-radius: var(--r-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .campus-bp__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .campus-bp__head h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .campus-bp__head span {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #daef8a;
+    }
+
+    .campus-bp__svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .campus-bp__node {
+      cursor: pointer;
+    }
+
+    .campus-bp__foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      font-size: 13px;
+    }
+
+    .campus-bp__foot code {
+      font-family: var(--font-mono);
+      color: #daef8a;
+    }
+
+    .footer__legal {
+      justify-content: center;
+    }
+
+    .footer__legal-left {
+      display: grid;
+      gap: 6px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .footer__legal-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- type: software
+     deal: hero centred, nav nav-centre, close close-type, footer footer-statement, rhythm dark-band, buttons solid, ground sage, effect silk-folds, moments word-highlight -->
+  <header class="nav nav--centre">
+    <div class="wrap nav__bar">
+      <a class="skip-link" href="#top">Skip to content</a>
+      <a class="nav__logo" href="#top"><img src="/assets/img/lostlink-badge.svg" alt="" width="44"
+          height="44">LostLink</a>
+      <nav class="nav__links" aria-label="Main">
+        <div class="nav__item">
+          <a class="nav__link" href="#console">Custody <svg class="chev" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg></a>
+          <div class="nav__menu">
+            <div class="wrap grid">
+              <div class="menu-col span-3">
+                <p class="t-label">Campus Feed</p>
+                <a href="/login" target="_top">Found items<span>Held at LSB Room 102</span></a>
+                <a href="/login" target="_top">Lost reports<span>Posted by DLSAU owners</span></a>
+              </div>
+              <div class="menu-col span-3">
+                <p class="t-label">Verification</p>
+                <a href="#features">ID photo shield<span>Auto-hides public ID photos</span></a>
+                <a href="#faq">Claim rules<span>20-character proof check</span></a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="nav__item"><a class="nav__link" href="#features">Protections</a></div>
+        <div class="nav__item"><a class="nav__link" href="#protocol">Protocol</a></div>
+        <div class="nav__item"><a class="nav__link" href="#faq">Questions</a></div>
+      </nav>
+      <div class="nav__actions">
+        <a class="nav__link" href="/login" target="_top">Sign in</a>
+        <a class="btn btn--primary" href="/login" target="_top">Report an item</a>
+        <a class="nav__dlsau" href="https://www.dlsau.edu.ph/" target="_blank" rel="noopener noreferrer"
+          aria-label="De La Salle Araneta University"><span class="nav__dlsau-name">De La Salle Araneta University</span><img
+            src="/assets/img/dlsau-logo.svg" alt="" width="42" height="42"></a>
+      </div>
+      <button class="nav__toggle" type="button" aria-expanded="false" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <path d="M2 5h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero hero--centred bg-mist" data-enter aria-labelledby="hero-h">
+      <div class="wrap">
+        <div class="hero-text">
+          <div class="hero__c">
+            <a class="pill" href="#console"><span>LSB Room 102</span><span class="muted">14 items held across 17 DLSAU
+                buildings</span></a>
+            <h1 id="hero-h">Campus lost and found for DLSAU</h1>
+            <p class="hero__lead">Students and staff report lost or found property, track custody by LL reference tag,
+              and verify claims at Life Science Building Room 102.</p>
+            <div class="btn-row">
+              <a class="btn btn--primary" href="/login" target="_top">Report an item<svg class="m-arrow" viewBox="0 0 12 12"
+                  aria-hidden="true">
+                  <path class="m-arrow__stem" d="M1 6h8" />
+                  <path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5" />
+                </svg></a>
+              <a class="btn btn--secondary" href="/login" target="_top">Browse campus feed</a>
+            </div>
+          </div>
+          <div class="hero__window" data-fx="fluted-glass" data-fx-seed="7" role="img"
+            aria-label="LostLink custody queue showing black bifold wallet LL-4821 and student ID card LL-4819">
+            <div class="ly-piece" aria-hidden="true">
+              <div class="ui ui-panel ui-win" data-ui="window" data-open="Found" data-work="Verifying"
+                data-done="Claimed">
+                <div class="ui-win__bar">
+                  <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span class="ui-win__crumb"><img src="/assets/img/lostlink-badge.svg" alt="" width="14"
+                      height="14">DLSAU <i>/</i> <b>LSB 102</b></span>
+                  <span class="ui-spacer"></span>
+                  <span class="ui-win__search" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 16 16">
+                      <circle cx="7" cy="7" r="4.5" />
+                      <path d="m10.5 10.5 3 3" />
+                    </svg><span class="ui-win__ph">LL-4821</span><span class="ui-kbd">/</span></span>
+                </div>
+                <div class="ui-win__body">
+                  <nav class="ui-win__side" aria-hidden="true">
+                    <span class="ui-win__nav is-on">Approved<em>14</em></span>
+                    <span class="ui-win__nav">Found<em>9</em></span>
+                    <span class="ui-win__nav">Lost<em>5</em></span>
+                    <span class="ui-win__label">Buildings</span>
+                    <span class="ui-win__nav"><span class="ui-win__hash">#</span>LSB</span>
+                    <span class="ui-win__nav"><span class="ui-win__hash">#</span>DVM</span>
+                  </nav>
+                  <div class="ui-win__main">
+                    <div class="ui-win__cols" aria-hidden="true">
+                      <span>Item</span><span>Location</span><span>Status</span><span>Tag</span>
+                    </div>
+                    <ul class="ui-win__rows">
+                      <li class="ui-win__row is-sel" data-row><img class="item-thumb" src="/assets/img/wallet.webp"
+                          alt="" width="24" height="24"><span class="ui-win__who">Black wallet</span><span
+                          class="ui-win__sub">Library 2F · Bifold slots</span><span class="ui-win__st is-work"
+                          data-st>Verifying</span><span class="ui-win__age">4821</span></li>
+                      <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="2">ID</span><span
+                          class="ui-win__who">Student RFID</span><span class="ui-win__sub">Gate 2 · Photo
+                          shielded</span><span class="ui-win__st" data-st>Found</span><span
+                          class="ui-win__age">4819</span></li>
+                      <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/keys.webp" alt=""
+                          width="24" height="24"><span class="ui-win__who">Green lanyard</span><span
+                          class="ui-win__sub">DVM Building · 3 keys</span><span class="ui-win__st"
+                          data-st>Found</span><span class="ui-win__age">4805</span></li>
+                      <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/laptop.webp" alt=""
+                          width="24" height="24"><span class="ui-win__who">Silver laptop</span><span
+                          class="ui-win__sub">2nd Cafeteria · Lost</span><span class="ui-win__st is-you"
+                          data-st>Match</span><span class="ui-win__age">92%</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- APP-FRAME: Full-width LostLink Custody & Proof Console -->
+    <section class="section" id="console" aria-labelledby="console-h">
+      <div class="wrap">
+        <div class="grid">
+          <div class="span-5">
+            <h2 id="console-h">Every campus item, verified before pickup</h2>
+          </div>
+          <div class="span-6 start-7">
+            <p class="t-lead">Found items stay locked at LSB Room 102 until an owner submits 20 or more characters of
+              physical proof matching the held object.</p>
+            <p style="margin-top: var(--s-3)"><a class="link" href="#features">See verification safeguards</a></p>
+          </div>
+        </div>
+        <div class="ui app fill" role="img"
+          aria-label="LostLink custody queue beside ownership proof verification for LL-4821" data-ui-pause-host>
+          <div class="app__pane app__pane--list">
+            <div class="ui ui-panel ui-win" data-ui="window" data-open="Held" data-work="Verifying" data-done="Claimed">
+              <div class="ui-win__bar">
+                <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="ui-win__crumb"><b>Campus Feed</b> <i>/</i> All 17 Buildings</span>
+                <span class="ui-spacer"></span>
+              </div>
+              <div class="ui-win__body">
+                <nav class="ui-win__side" aria-hidden="true">
+                  <span class="ui-win__nav is-on">All Items<em>10</em></span>
+                  <span class="ui-win__nav">Found<em>6</em></span>
+                  <span class="ui-win__nav">Lost<em>4</em></span>
+                  <span class="ui-win__nav">ID Shield<em>2</em></span>
+                </nav>
+                <div class="ui-win__main">
+                  <div class="ui-win__cols" aria-hidden="true">
+                    <span>Item</span><span>Detail</span><span>Status</span><span>Ref</span>
+                  </div>
+                  <ul class="ui-win__rows">
+                    <li class="ui-win__row is-sel" data-row><img class="item-thumb" src="/assets/img/wallet.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">Bifold wallet</span><span
+                        class="ui-win__sub">Library 2F</span><span class="ui-win__st is-work"
+                        data-st>Verifying</span><span class="ui-win__age">4821</span></li>
+                    <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="3">ID</span><span
+                        class="ui-win__who">DLSAU RFID</span><span class="ui-win__sub">Gate 2 · Redacted</span><span
+                        class="ui-win__st" data-st>Held</span><span class="ui-win__age">4819</span></li>
+                    <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/keys.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">Lanyard keys</span><span
+                        class="ui-win__sub">DVM Building</span><span class="ui-win__st" data-st>Held</span><span
+                        class="ui-win__age">4805</span></li>
+                    <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/earbuds.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">Earbuds case</span><span
+                        class="ui-win__sub">Admin Lobby</span><span class="ui-win__st" data-st>Held</span><span
+                        class="ui-win__age">4798</span></li>
+                    <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/calculator.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">FX-991ES</span><span
+                        class="ui-win__sub">Science Lab 302</span><span class="ui-win__st" data-st>Held</span><span
+                        class="ui-win__age">4760</span></li>
+                    <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/laptop.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">14in laptop</span><span class="ui-win__sub">2nd
+                        Cafeteria</span><span class="ui-win__st is-you" data-st>Match</span><span
+                        class="ui-win__age">Lost</span></li>
+                    <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/water_bottle.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">Blue bottle</span><span
+                        class="ui-win__sub">Grandstand</span><span class="ui-win__st" data-st>Lost</span><span
+                        class="ui-win__age">Oct 8</span></li>
+                    <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/backpack.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">Navy backpack</span><span
+                        class="ui-win__sub">Chapel steps</span><span class="ui-win__st" data-st>Lost</span><span
+                        class="ui-win__age">Oct 6</span></li>
+                    <li class="ui-win__row" data-row><img class="item-thumb" src="/assets/img/eyeglasses.webp" alt=""
+                        width="24" height="24"><span class="ui-win__who">Eyeglasses</span><span
+                        class="ui-win__sub">Library 1F</span><span class="ui-win__st is-done"
+                        data-st>Claimed</span><span class="ui-win__age">4740</span></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="app__pane app__pane--open" data-ui-loop>
+            <div class="ui ui-doc" data-ui="doc" style="width:100%;">
+              <article class="ui-doc__page">
+                <div class="ui-doc__label">Custody Tag LL-4821 · LSB Room 102</div>
+                <div class="ui-doc__title">Claim verification for Black bifold leather wallet</div>
+                <div class="ui-doc__text">Claimant submitted ownership proof: <mark class="ui-doc__mark is-on">Green
+                    DLSAU library card and BPI card inside</mark> with a scratch along the inner fold.</div>
+                <div class="ui-doc__text">Security staff verified physical contents in Vault Drawer B-04. <mark
+                    class="ui-doc__mark" data-kind="Handover"
+                    data-msg="Present valid DLSAU ID with tag LL-4821 at LSB Room 102."
+                    data-where="Security Admin Log · Verified">Release authorized</mark> for campus pickup.</div>
+                <div class="ui-doc__text">Competing pending claims on this item automatically update to denied and
+                  notify the claimants.</div>
+              </article>
+              <aside class="ui-doc__note ui-panel is-on" aria-live="polite">
+                <div class="ui-doc__kind"><span class="ui-doc__dot"></span><span data-doc-kind>Verified</span></div>
+                <div class="ui-doc__msg" data-doc-msg>Physical contents match claimant proof.</div>
+                <div class="ui-doc__where" data-doc-where>LSB Room 102 · Tag LL-4821</div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES 2x2 on Dark Band -->
+    <section class="section g2 ground-inverse" id="features" aria-labelledby="features-h">
+      <div class="wrap">
+        <div class="group">
+          <div class="section-head">
+            <h2 id="features-h">Built for campus security. <span class="muted">Privacy shields, trigram checks, and
+                tagged handovers.</span></h2>
+          </div>
+          <div class="grid">
+            <article class="card card--row span-6 m-nolift">
+              <h3>Searches 17 DLSAU buildings</h3>
+              <p>Filter approved listings by building, category, date, or serial tag such as LL-4821.</p>
+              <div class="panel panel--flush" data-fx="silk-folds" data-fx-seed="21" data-fx-params='{"drift":0}'>
+                <div class="stage stage--fade-b">
+                  <div class="at-rise fit" style="--fit-max:400px;--ax:max(24px, 50% - 200px);--ay:44px;--ay-sm:20px"
+                    data-ui-loop>
+                    <div class="ui ui-panel ui-search" data-ui="search">
+                      <div class="ui-search__field">
+                        <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true">
+                          <circle cx="7" cy="7" r="4.5" />
+                          <path d="m10.5 10.5 3 3" />
+                        </svg>
+                        <span class="ui-search__q"><span data-search-q>wallet lsb</span><i
+                            class="ui-search__caret"></i></span>
+                        <kbd class="ui-search__kbd">Ctrl K</kbd>
+                      </div>
+                      <div class="ui-search__group">DLSAU Matches</div>
+                      <ul class="ui-search__list" data-search-list>
+                        <li class="ui-search__row is-sel"><span class="ui-search__t"><b>Wallet</b> · LL-4821 at Library
+                            2F</span><span class="ui-search__m">Found</span></li>
+                        <li class="ui-search__row"><span class="ui-search__t">Student RFID · LL-4819 at Gate
+                            2</span><span class="ui-search__m">Shield</span></li>
+                        <li class="ui-search__row"><span class="ui-search__t">Keys · LL-4805 at DVM Building</span><span
+                            class="ui-search__m">Found</span></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="card card--row span-6 m-nolift">
+              <h3>Protects student ID photos</h3>
+              <p>Reports under IDs, Cards and Wallets hide photos publicly while admins inspect them.</p>
+              <div class="panel panel--flush" data-fx="silk-folds" data-fx-seed="34" data-fx-params='{"drift":0}'>
+                <div class="stage stage--fade-b">
+                  <div class="at-rise fit" style="--fit-max:400px;--ax:max(24px, 50% - 200px);--ay:44px;--ay-sm:20px">
+                    <div class="ui ui-panel ui-checks" data-ui="checklist">
+                      <div class="ui-checks__head">
+                        <div class="ui-title">Privacy guard</div><span class="ui-spacer"></span>
+                        <div class="ui-meta" data-checks-count>3 of 4</div>
+                      </div>
+                      <div class="ui-checks__bar"><i data-checks-bar style="--k:0.75"></i></div>
+                      <ul class="ui-checks__list">
+                        <li class="ui-check is-done"><span class="ui-check__box"><svg viewBox="0 0 16 16">
+                              <path d="m4.5 8.2 2.3 2.3 4.7-5" />
+                            </svg></span><span class="ui-check__label">@dlsau.edu.ph login verified</span></li>
+                        <li class="ui-check is-done"><span class="ui-check__box"><svg viewBox="0 0 16 16">
+                              <path d="m4.5 8.2 2.3 2.3 4.7-5" />
+                            </svg></span><span class="ui-check__label">hide_photo enabled for IDs</span></li>
+                        <li class="ui-check is-done"><span class="ui-check__box"><svg viewBox="0 0 16 16">
+                              <path d="m4.5 8.2 2.3 2.3 4.7-5" />
+                            </svg></span><span class="ui-check__label">Reporter email hidden publicly</span></li>
+                        <li class="ui-check"><span class="ui-check__box"><svg viewBox="0 0 16 16">
+                              <path d="m4.5 8.2 2.3 2.3 4.7-5" />
+                            </svg></span><span class="ui-check__label">20-char proof verified at LSB</span></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card card--row span-6 m-nolift">
+            <h3>Alerts owners on match</h3>
+            <p>Trigram similarity detects matching found items within 14 days and sends notifications.</p>
+            <div class="panel panel--flush" data-fx="silk-folds" data-fx-seed="55" data-fx-params='{"drift":0}'>
+              <div class="stage">
+                <div class="at-center">
+                  <div class="ui ui-notify" data-ui="notify">
+                    <ul class="ui-notify__list" data-notify-list>
+                      <li class="ui-note"><span class="ui-agent ui-note__av" aria-hidden="true"></span><span
+                          class="ui-note__text"><span class="ui-note__title">Possible match
+                            found<time>now</time></span><span class="ui-note__body">Silver 14in laptop matched
+                            LL-4830</span></span><span class="ui-btn ui-btn--sm ui-note__btn">Open</span></li>
+                      <li class="ui-note"><span class="ui-avatar ui-note__av" data-tone="2">SB</span><span
+                          class="ui-note__text"><span class="ui-note__title">Claim verified<time>12m</time></span><span
+                            class="ui-note__body">Visit LSB Room 102 with LL-4821</span></span></li>
+                      <li class="ui-note"><span class="ui-note__ico"><svg class="ui-icon" viewBox="0 0 16 16">
+                            <path d="m3.5 8.4 2.8 2.8 6.2-6.4" />
+                          </svg></span><span class="ui-note__text"><span class="ui-note__title">Report
+                            approved<time>1h</time></span><span class="ui-note__body">Now visible on DLSAU
+                            feed</span></span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card card--row span-6 m-nolift">
+            <h3>Routes custody in one flow</h3>
+            <p>Every report moves through intake, admin review, and physical drop-off at LSB Room 102.</p>
+            <div class="panel panel--flush" data-fx="silk-folds" data-fx-seed="89" data-fx-params='{"drift":0}'>
+              <div class="stage">
+                <div class="at-center">
+                  <div class="ui ui-panel ui-checks" data-ui="checklist">
+                    <div class="ui-checks__head">
+                      <div class="ui-title">Tag LL-4821 Custody</div><span class="ui-spacer"></span>
+                      <div class="ui-meta" data-checks-count>3 of 3</div>
+                    </div>
+                    <div class="ui-checks__bar"><i data-checks-bar style="--k:1"></i></div>
+                    <ul class="ui-checks__list">
+                      <li class="ui-check is-done"><span class="ui-check__box"><svg viewBox="0 0 16 16">
+                            <path d="m4.5 8.2 2.3 2.3 4.7-5" />
+                          </svg></span><span class="ui-check__label">Signed in via @dlsau.edu.ph</span></li>
+                      <li class="ui-check is-done"><span class="ui-check__box"><svg viewBox="0 0 16 16">
+                            <path d="m4.5 8.2 2.3 2.3 4.7-5" />
+                          </svg></span><span class="ui-check__label">14-day pg_trgm check clear</span></li>
+                      <li class="ui-check is-done"><span class="ui-check__box"><svg viewBox="0 0 16 16">
+                            <path d="m4.5 8.2 2.3 2.3 4.7-5" />
+                          </svg></span><span class="ui-check__label">Held in Vault Drawer at LSB 102</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- WORD-HIGHLIGHT MOMENT + FAQ -->
+    <section class="section statement ground-surface" id="protocol" data-moment="word-highlight"
+      aria-label="Custody rule">
+      <div class="wrap">
+        <p class="mo-wh__text">Every found item at De La Salle Araneta receives a serial tag and stays locked at
+          <strong>LSB Room 102</strong> until security verifies the owner.
+        </p>
+        <div class="grid custody-strip">
+          <div class="span-4 custody-strip__col">
+            <h3>Serial Tagging</h3>
+            <p>Each recovered property is logged with a printed reference code on intake.</p>
+            <span class="custody-strip__meta">LL-XXXX on intake</span>
+          </div>
+          <div class="span-4 custody-strip__col">
+            <h3>14-Day Match &amp; Vault Hold</h3>
+            <p>Trigram similarity scans incoming reports against locked items inside the vault.</p>
+            <span class="custody-strip__meta">14-day pg_trgm window</span>
+          </div>
+          <div class="span-4 custody-strip__col">
+            <h3>Walk-In Release</h3>
+            <p>Verified owners present their DLSAU ID at Life Science Building Room 102.</p>
+            <span class="custody-strip__meta">Mon–Fri, 8:00 AM–5:00 PM</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq" aria-labelledby="faq-h">
+      <div class="wrap">
+        <div class="grid">
+          <div class="span-5 stack-4">
+            <div class="section-head" style="margin-bottom:0">
+              <h2 id="faq-h">Campus questions</h2>
+            </div>
+            <div class="campus-bp" role="region" aria-label="DLSAU walkways and LSB Room 102 custody schematic">
+              <div class="campus-bp__head">
+                <h3>DLSAU Walkways &amp; Vault</h3>
+                <span>17 ZONES</span>
+              </div>
+              <svg class="campus-bp__svg" viewBox="0 0 360 250" fill="none">
+                <path d="M40 205 H310 M95 35 V205 M245 50 V205 M95 120 H245" stroke="rgba(255,255,255,0.22)"
+                  stroke-width="2" stroke-dasharray="5 5" />
+                <path id="bp-route" d="M95 120 L245 120 L245 205" stroke="#daef8a" stroke-width="2.5" />
+                <g class="campus-bp__node" data-bp-zone="DVM Building" data-bp-tags="1 active tag"
+                  data-bp-path="M95 50 V120 H245 V205" tabindex="0" role="button" aria-label="DVM Building">
+                  <circle cx="95" cy="50" r="7" fill="#ffffff" />
+                  <text x="110" y="54" fill="#d6e7dd" font-family="DM Mono, monospace" font-size="11">DVM BLDG
+                    (1)</text>
+                </g>
+                <g class="campus-bp__node" data-bp-zone="Library 2F" data-bp-tags="3 active tags"
+                  data-bp-path="M95 120 H245 V205" tabindex="0" role="button" aria-label="Library 2F">
+                  <circle cx="95" cy="120" r="8" fill="#daef8a" />
+                  <text x="14" y="108" fill="#daef8a" font-family="DM Mono, monospace" font-size="11">LIBRARY 2F
+                    (3)</text>
+                </g>
+                <g class="campus-bp__node" data-bp-zone="2nd Cafeteria" data-bp-tags="1 lost alert"
+                  data-bp-path="M245 62 V205" tabindex="0" role="button" aria-label="2nd Cafeteria">
+                  <circle cx="245" cy="62" r="7" fill="#ffffff" />
+                  <text x="258" y="66" fill="#d6e7dd" font-family="DM Mono, monospace" font-size="11">2ND CAFE
+                    (1)</text>
+                </g>
+                <g class="campus-bp__node" data-bp-zone="Gate 2" data-bp-tags="2 active tags"
+                  data-bp-path="M95 205 H245" tabindex="0" role="button" aria-label="Gate 2">
+                  <circle cx="95" cy="205" r="7" fill="#ffffff" />
+                  <text x="18" y="228" fill="#d6e7dd" font-family="DM Mono, monospace" font-size="11">GATE 2 (2)</text>
+                </g>
+                <rect x="205" y="182" width="126" height="44" rx="8" fill="#daef8a" />
+                <text x="218" y="202" fill="#0a0a0a" font-family="Outfit, sans-serif" font-weight="600"
+                  font-size="12">LSB ROOM 102</text>
+                <text x="218" y="216" fill="#134e3a" font-family="DM Mono, monospace" font-size="10">CENTRAL
+                  CUSTODY</text>
+              </svg>
+              <div class="campus-bp__foot">
+                <span id="bp-selected">Route: Library 2F → LSB 102</span>
+                <code id="bp-tags">3 active tags</code>
+              </div>
+            </div>
+          </div>
+          <div class="span-6 start-7">
+            <div class="faq">
+              <div class="faq__item">
+                <h3>Where do I drop off a found item?</h3>
+                <p>Submit the found report online to generate your LL reference code, write the code on a tag, and bring
+                  the item to Life Science Building Room 102.</p>
+              </div>
+              <div class="faq__item">
+                <h3>Why are student ID photos hidden?</h3>
+                <p>Any report under IDs, Cards and Wallets enables hide_photo automatically so personal student photos
+                  stay visible only to Security Admins.</p>
+              </div>
+              <div class="faq__item">
+                <h3>How does claim verification work?</h3>
+                <p>Owners submit at least 20 characters describing unique marks or contents. Security compares the proof
+                  against the item held at LSB before pickup.</p>
+              </div>
+              <div class="faq__item">
+                <h3>Who can sign in to LostLink?</h3>
+                <p>Access is limited to verified @dlsau.edu.ph student, faculty, staff, and campus security accounts.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer closing footer--statement" id="report" aria-labelledby="close-h">
+    <div class="wrap">
+      <div class="closing__cta close--type">
+        <div class="section-head">
+          <h2 id="close-h">Report an item</h2>
+          <p>Log a lost sighting or found custody item with your @dlsau.edu.ph account.</p>
+        </div>
+        <a class="btn btn--primary btn--xl" href="/login" target="_top">Report an item<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
+      </div>
+      <div class="closing__links">
+        <div class="grid">
+          <div class="span-4 stack-4">
+            <a class="nav__logo" href="#top"><img src="/assets/img/lostlink-badge.svg" alt="" width="28"
+                height="28">LostLink</a>
+            <p class="footer__lede">De La Salle Araneta University · Life Science Building Room 102.</p>
+          </div>
+          <div class="span-2 footer__col">
+            <h3>Feed</h3>
+            <ul>
+              <li><a href="/login" target="_top">Found items</a></li>
+              <li><a href="/login" target="_top">Lost reports</a></li>
+            </ul>
+          </div>
+          <div class="span-2 footer__col">
+            <h3>Portal</h3>
+            <ul>
+              <li><a href="/login" target="_top">Sign in</a></li>
+              <li><a href="/register" target="_top">Register</a></li>
+            </ul>
+          </div>
+          <div class="span-2 footer__col">
+            <h3>Custody</h3>
+            <ul>
+              <li><a href="#protocol">LSB Room 102</a></li>
+              <li><a href="#faq">Claim rules</a></li>
+            </ul>
+          </div>
+          <div class="span-2 footer__col">
+            <h3>Campus</h3>
+            <ul>
+              <li><a href="#faq">17 Buildings</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__legal">
+          <div class="footer__legal-left">
+            <span>&copy; 2026 LostLink DLSAU</span>
+            <span class="footer__legal-links"><a href="/privacy" target="_top">Privacy</a><a href="/terms" target="_top">Terms</a></span>
+          </div>
+          <div class="socials"></div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="assets/system.js"></script>
+  <script type="module" src="assets/motion/motion.js"></script>
+  <script type="module" src="assets/layout/layout.js"></script>
+  <script>
+      (() => {
+        const route = document.getElementById('bp-route');
+        const sel = document.getElementById('bp-selected');
+        const tags = document.getElementById('bp-tags');
+        const nodes = [...document.querySelectorAll('[data-bp-zone]')];
+        const pick = n => {
+          route?.setAttribute('d', n.dataset.bpPath);
+          if (sel) sel.textContent = `Route: ${n.dataset.bpZone} → LSB 102`;
+          if (tags) tags.textContent = n.dataset.bpTags;
+          nodes.forEach(x => {
+            x.querySelector('circle')?.setAttribute('fill', x === n ? '#daef8a' : '#ffffff');
+            x.querySelector('text')?.setAttribute('fill', x === n ? '#daef8a' : '#d6e7dd');
+          });
+        };
+        nodes.forEach(n => {
+          n.addEventListener('click', () => pick(n));
+          n.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(n); }
+          });
+        });
+
+        // Route internal target="_top" links through the parent React Router for instant SPA transitions.
+        if (window.parent !== window && window.location.origin !== 'null') {
+          document.addEventListener('click', (e) => {
+            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            const link = e.target instanceof Element ? e.target.closest('a[target="_top"][href^="/"]') : null;
+            if (!link) return;
+            const to = link.getAttribute('href');
+            if (!to || to.startsWith('//')) return;
+            e.preventDefault();
+            window.parent.postMessage({ type: 'lostlink:navigate', to }, window.location.origin);
+          });
+        }
+      })();
+  </script>
+</body>
+
+</html>

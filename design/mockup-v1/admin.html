@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en" data-type="software" data-radius="soft" data-buttons="solid">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin Console · LostLink DLSAU</title>
+<meta name="description" content="Disciplinary Office console for verifying ownership claims, confirming physical intake, and publishing campus broadcasts.">
+<link rel="icon" href="assets/img/lostlink-badge.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f6f7f2">
+<meta name="site-kind" content="software">
+<meta name="page-type" content="software">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/system.css">
+<style>
+:root {
+  --p-bg: #f6f7f2;
+  --p-surface: #ffffff;
+  --p-ink: #0a0a0a;
+  --p-muted: #454545;
+  --p-accent: #1f6b3a;
+  --p-accent-ink: #ffffff;
+  --p-action: #1f6b3a;
+  --p-action-ink: #ffffff;
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-text: "Outfit", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --display-weight: 500;
+  --display-tracking: -0.025em;
+}
+
+body {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  caret-color: var(--action);
+  accent-color: var(--action);
+  font-variant-numeric: tabular-nums;
+}
+
+.vault-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.vault-head__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: var(--nav);
+  padding-block: var(--s-2);
+}
+.vault-head__left {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+}
+.nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
+}
+.nav__dlsau {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--r-sm);
+}
+.nav__dlsau img { width: 48px; height: 48px; }
+.vault-head .nav__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+.vault-head .nav__logo img { width: 44px; height: 44px; border-radius: 10px; flex: none; }
+
+.portal-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.portal-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-sm);
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--muted);
+}
+.portal-nav a:hover { color: var(--ink); background: var(--p-surface); }
+.portal-nav a[aria-current="page"] {
+  color: var(--ink);
+  background: var(--p-surface);
+  border: 1px solid var(--line-strong);
+}
+
+.vault-head__right {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: none;
+}
+.vault-role-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--p-surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--action);
+}
+.vault-signout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--s-2);
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--muted);
+  text-underline-offset: 3px;
+}
+.vault-signout:hover { color: var(--ink); text-decoration: underline; }
+
+.admin-main {
+  flex: 1 0 auto;
+  padding-block: clamp(24px, 3vw, 40px) var(--s-8);
+}
+.admin-stack {
+  display: grid;
+  gap: var(--s-5);
+}
+
+.admin-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+.admin-header__title {
+  font-size: clamp(26px, 1.4vw + 21px, 34px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+.admin-header__sub {
+  margin-top: var(--s-2);
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-4);
+}
+.kpi-cell {
+  background: var(--p-surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  padding: var(--s-4) var(--s-5);
+  display: grid;
+  gap: 6px;
+}
+.kpi-cell--accent {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--action-ink);
+}
+.kpi-cell--accent .kpi-cell__label,
+.kpi-cell--accent .kpi-cell__hint {
+  color: color-mix(in oklab, var(--action-ink) 86%, transparent);
+}
+.kpi-cell__label { font-size: var(--t-small); color: var(--muted); }
+.kpi-cell__val { font-size: 30px; font-weight: 600; line-height: 1.05; letter-spacing: -0.025em; }
+.kpi-cell__hint { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--p-surface);
+  color: var(--ink);
+  font-size: var(--t-small);
+  font-weight: 500;
+  cursor: pointer;
+}
+.admin-tab[aria-selected="true"] {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--action-ink);
+}
+.admin-tab__n { font-family: var(--font-mono); font-size: 12px; opacity: 0.85; }
+
+.admin-split {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+
+.ledger-sheet,
+.dossier-sheet {
+  background: var(--p-surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.ledger-sheet__head,
+.dossier-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.ledger-sheet__title,
+.dossier-sheet__title { font-size: 16px; font-weight: 600; }
+.ledger-sheet__meta { font-family: var(--font-mono); font-size: var(--t-label); color: var(--muted); }
+
+.ledger-row {
+  width: 100%;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  align-items: center;
+  padding: var(--s-3) var(--s-5);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--p-surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row:hover { background: var(--p-bg); }
+.ledger-row[aria-current="true"] { background: #eaf1e9; }
+
+.ledger-main-col { min-width: 0; display: grid; gap: 2px; }
+.ledger-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ledger-sub { font-size: var(--t-small); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ledger-tag { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  justify-self: end;
+}
+.status-pill--pending { background: #fef3c7; color: #7c3f05; border-color: #f4d68c; }
+.status-pill--verified { background: #e7f3ea; color: #15522b; border-color: #c2dec9; }
+.status-pill--denied { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.status-pill--info { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
+
+.intake-row {
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.intake-row:last-child { border-bottom: 0; }
+
+.dossier-sheet {
+  position: sticky;
+  top: calc(var(--nav) + var(--s-4));
+}
+.dossier-body {
+  padding: var(--s-5);
+  display: grid;
+  gap: var(--s-4);
+}
+.dossier-media {
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: var(--p-bg);
+  aspect-ratio: 16 / 9;
+}
+.dossier-media img { width: 100%; height: 100%; object-fit: cover; }
+
+.dossier-specs { border-top: 1px solid var(--line); }
+.dossier-spec {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding-block: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--t-small);
+}
+.dossier-spec dt { color: var(--muted); }
+.dossier-spec dd { margin: 0; font-weight: 500; text-align: right; }
+
+.proof-box {
+  padding: var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--p-bg);
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+}
+.proof-box__label { font-family: var(--font-mono); font-size: 12px; color: var(--action); }
+.proof-box p { font-size: var(--t-small); line-height: 1.5; }
+
+.action-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+.btn--danger {
+  background: #ffffff;
+  color: #991b1b;
+  border-color: #ef9a9a;
+}
+.btn--danger:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.vault-form {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+}
+.vault-form .field :is(input, select, textarea) { background: var(--p-surface); }
+.vault-form .field :is(input, select) { height: var(--btn-h); }
+.vault-form .field textarea { min-height: 88px; }
+.vault-form .field :is(input, textarea)::placeholder { color: #686868; opacity: 1; }
+
+.vault-foot { border-top: 1px solid var(--line); background: var(--bg); }
+.vault-foot__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  padding-block: var(--s-5);
+  font-size: var(--t-small);
+  color: var(--muted);
+}
+.vault-foot__links { display: flex; align-items: center; gap: var(--s-5); }
+.vault-foot__links a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 3px; }
+
+@media (max-width: 1023px) {
+  .vault-role-tag { display: none; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-split { grid-template-columns: minmax(0, 1fr); }
+  .dossier-sheet { position: static; }
+}
+
+@media (max-width: 639px) {
+  .vault-head { position: relative; }
+  .vault-head__bar { flex-wrap: wrap; row-gap: var(--s-2); }
+  .portal-nav { order: 3; width: 100%; overflow-x: auto; }
+  .kpi-grid,
+  .action-pair { grid-template-columns: minmax(0, 1fr); }
+  .ledger-row { grid-template-columns: minmax(0, 1fr) auto; padding-inline: var(--s-4); }
+  .ledger-row .ledger-claimant { display: none; }
+  .ledger-sheet__head,
+  .dossier-sheet__head,
+  .dossier-body,
+  .intake-row { padding-inline: var(--s-4); }
+}
+</style>
+</head>
+<body>
+<header class="vault-head">
+  <div class="wrap vault-head__bar">
+    <div class="vault-head__left">
+      <a class="skip-link" href="#admin-main">Skip to admin console</a>
+      <div class="nav__brand">
+        <a class="nav__dlsau" href="https://www.dlsau.edu.ph/" target="_blank" rel="noopener noreferrer" aria-label="De La Salle Araneta University">
+          <img src="assets/img/dlsau-logo.svg" alt="De La Salle Araneta University" width="28" height="28">
+        </a>
+        <a class="nav__logo" href="index.html">
+          <img src="assets/img/lostlink-badge.svg" alt="" width="28" height="28">
+          <span>LostLink</span>
+        </a>
+      </div>
+      <nav class="portal-nav" aria-label="Admin navigation">
+        <a href="admin.html" aria-current="page">Overview</a>
+        <a href="admin-users.html">User Directory</a>
+        <a href="feed.html">Campus Feed</a>
+      </nav>
+    </div>
+
+    <div class="vault-head__right">
+      <span class="vault-role-tag">DO Admin · LSB 102</span>
+      <a class="vault-signout" href="login.html">Sign out</a>
+    </div>
+  </div>
+</header>
+
+<main id="admin-main" class="wrap admin-main">
+  <div class="admin-stack">
+    <div class="admin-header">
+      <div>
+        <h1 class="admin-header__title">Disciplinary Office Console</h1>
+        <p class="admin-header__sub">Verify physical ownership proofs at LSB Room 102, confirm student turn-ins, and manage campus notices.</p>
+      </div>
+      <a class="btn btn--secondary" href="admin-users.html">Manage 180 campus accounts</a>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-cell">
+        <span class="kpi-cell__label">Items in custody</span>
+        <strong class="kpi-cell__val" id="kpi-custody">14</strong>
+        <span class="kpi-cell__hint">LSB Room 102 vault</span>
+      </div>
+      <div class="kpi-cell">
+        <span class="kpi-cell__label">Waiting for intake</span>
+        <strong class="kpi-cell__val" id="kpi-intake">3</strong>
+        <span class="kpi-cell__hint">Pending physical drop-off</span>
+      </div>
+      <div class="kpi-cell kpi-cell--accent">
+        <span class="kpi-cell__label">Claims to verify</span>
+        <strong class="kpi-cell__val" id="kpi-claims">3</strong>
+        <span class="kpi-cell__hint">1 student at desk now</span>
+      </div>
+      <div class="kpi-cell">
+        <span class="kpi-cell__label">Returned this month</span>
+        <strong class="kpi-cell__val" id="kpi-returned">19</strong>
+        <span class="kpi-cell__hint">+4 vs last month</span>
+      </div>
+    </div>
+
+    <div class="admin-tabs" role="tablist" aria-label="Admin queues">
+      <button type="button" class="admin-tab" role="tab" aria-selected="true" aria-controls="panel-claims" id="tab-claims">Claims to verify <span class="admin-tab__n" id="n-claims">3</span></button>
+      <button type="button" class="admin-tab" role="tab" aria-selected="false" aria-controls="panel-intake" id="tab-intake">Waiting for intake <span class="admin-tab__n" id="n-intake">3</span></button>
+      <button type="button" class="admin-tab" role="tab" aria-selected="false" aria-controls="panel-broadcasts" id="tab-broadcasts">Campus broadcasts <span class="admin-tab__n" id="n-broadcasts">2</span></button>
+    </div>
+
+    <div class="admin-split">
+      <!-- Left: Queue Panels -->
+      <div>
+        <section class="ledger-sheet" id="panel-claims" role="tabpanel" aria-labelledby="tab-claims">
+          <div class="ledger-sheet__head">
+            <h2 class="ledger-sheet__title">Claims queue</h2>
+            <span class="ledger-sheet__meta" id="claims-meta">Select a claim to verify</span>
+          </div>
+          <div id="claims-queue"></div>
+        </section>
+
+        <section class="ledger-sheet" id="panel-intake" role="tabpanel" aria-labelledby="tab-intake" hidden>
+          <div class="ledger-sheet__head">
+            <h2 class="ledger-sheet__title">Waiting for physical drop-off</h2>
+            <span class="ledger-sheet__meta">Confirm once item reaches LSB 102</span>
+          </div>
+          <div id="intake-queue"></div>
+        </section>
+
+        <section class="ledger-sheet" id="panel-broadcasts" role="tabpanel" aria-labelledby="tab-broadcasts" hidden>
+          <div class="ledger-sheet__head">
+            <h2 class="ledger-sheet__title">Active campus notices</h2>
+            <span class="ledger-sheet__meta">Visible in student header ticker</span>
+          </div>
+          <div id="broadcast-list"></div>
+          <div class="dossier-body" style="border-top: 1px solid var(--line);">
+            <form class="form vault-form" id="broadcast-form" action="admin.html" method="get" data-fix="Fix {n} fields below.">
+              <div class="field field--full">
+                <label for="bc-tier">Urgency tier</label>
+                <select id="bc-tier" name="tier">
+                  <option value="Info">Info · Normal campus notice</option>
+                  <option value="Warning">Warning · Custody cutoff</option>
+                  <option value="Alert">Alert · Urgent security notice</option>
+                </select>
+              </div>
+              <div class="field field--full">
+                <label for="bc-msg">Announcement message</label>
+                <input id="bc-msg" name="message" type="text" placeholder="e.g. Semester unclaimed items window closes Friday 5:00 PM." data-error="Enter a broadcast message." required>
+              </div>
+              <div class="field--full">
+                <button type="submit" class="btn btn--primary vault-submit">Publish campus broadcast</button>
+              </div>
+              <p class="form__status" role="status" data-form-status></p>
+            </form>
+          </div>
+        </section>
+      </div>
+
+      <!-- Right: Claim Dossier -->
+      <aside class="dossier-sheet" aria-label="Claim verification dossier">
+        <div class="dossier-sheet__head">
+          <h2 class="dossier-sheet__title">Claim dossier</h2>
+          <span class="ledger-sheet__meta" id="dossier-tag">LL-4821</span>
+        </div>
+        <div class="dossier-body">
+          <div class="dossier-media" id="admin-media"></div>
+          <div>
+            <h3 style="font-size:20px;font-weight:600;line-height:1.2;" id="admin-item-name">Black bifold leather wallet</h3>
+            <p style="margin-top:4px;font-size:var(--t-small);color:var(--muted);" id="admin-item-loc">Found at Library 2F · Photo visible to DO Admin only</p>
+          </div>
+          <dl class="dossier-specs" id="admin-specs"></dl>
+          <div class="proof-box">
+            <span class="proof-box__label">Private claimant ownership proof</span>
+            <p id="admin-proof"></p>
+          </div>
+          <div class="action-pair">
+            <button type="button" class="btn btn--primary" id="approve-btn">Approve &amp; Release</button>
+            <button type="button" class="btn btn--secondary btn--danger" id="deny-btn">Deny Claim</button>
+          </div>
+          <p class="form__status" role="status" id="admin-action-status"></p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<footer class="vault-foot">
+  <div class="wrap vault-foot__bar">
+    <span>LostLink · De La Salle Araneta University · Disciplinary Office Console</span>
+    <nav class="vault-foot__links" aria-label="Legal">
+      <a href="feed.html">Student View</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Use</a>
+    </nav>
+  </div>
+</footer>
+
+<script type="module" src="assets/system.js"></script>
+<script>
+(() => {
+  const claims = [
+    {
+      id: 'C-101',
+      tag: 'LL-4821',
+      item: 'Black bifold leather wallet',
+      loc: 'Library 2F',
+      claimant: 'Juan D. Reyes',
+      sid: '2023-00-012340',
+      email: 'juan.reyes@dlsau.edu.ph',
+      program: 'BSCS · CAST',
+      status: 'pending',
+      statusLabel: 'At desk now',
+      img: 'assets/img/wallet.webp',
+      shielded: true,
+      proof: 'Green DLSAU library card and BPI debit card inside, scratch along the inner fold.',
+    },
+    {
+      id: 'C-102',
+      tag: 'LL-4819',
+      item: 'DLSAU Student RFID Card',
+      loc: 'Gate 2',
+      claimant: 'Maria Santos',
+      sid: '2022-00-048712',
+      email: 'maria.santos@dlsau.edu.ph',
+      program: 'DVM · CVMAS',
+      status: 'pending',
+      statusLabel: 'Pending review',
+      img: 'assets/img/student_id.jpg',
+      shielded: true,
+      proof: 'Lanyard clip is cracked on the back and student number ends in 48712.',
+    },
+    {
+      id: 'C-103',
+      tag: 'LL-4805',
+      item: 'Green DLSAU lanyard with 3 keys',
+      loc: 'DVM Building',
+      claimant: 'Paolo Cruz',
+      sid: '2024-00-003188',
+      email: 'paolo.cruz@dlsau.edu.ph',
+      program: 'BSA · CVMAS',
+      status: 'pending',
+      statusLabel: 'Pending review',
+      img: 'assets/img/keys.webp',
+      shielded: false,
+      proof: 'Two brass Yale keys plus one smaller silver padlock key on a bent split ring.',
+    },
+  ];
+
+  const intake = [
+    { tag: 'LL-4834', name: 'Grey drawstring bag', reporter: 'Kevin L. · 20m ago', loc: 'Gymnasium' },
+    { tag: 'LL-4832', name: 'Black insulated tumbler', reporter: 'Liza M. · 1h ago', loc: 'Admin Bldg' },
+    { tag: 'LL-4829', name: 'Casio scientific calculator', reporter: 'Ben T. · 3h ago', loc: 'Science Lab 201' },
+  ];
+
+  const broadcasts = [
+    { tier: 'Info', pill: 'info', msg: 'LSB Room 102 custody desk open Mon–Fri, 8:00 AM–5:00 PM.' },
+    { tier: 'Warning', pill: 'pending', msg: '3 items unclaimed past the 30-day custodial window; review by Friday.' },
+  ];
+
+  let selectedId = claims[0].id;
+  let custodyCount = 14;
+  let returnedCount = 19;
+
+  const claimsQueue = document.getElementById('claims-queue');
+  const intakeQueue = document.getElementById('intake-queue');
+  const broadcastList = document.getElementById('broadcast-list');
+  const actionStatus = document.getElementById('admin-action-status');
+
+  const syncCounts = () => {
+    const pendingN = claims.filter(c => c.status === 'pending').length;
+    document.getElementById('kpi-custody').textContent = String(custodyCount);
+    document.getElementById('kpi-intake').textContent = String(intake.length);
+    document.getElementById('kpi-claims').textContent = String(pendingN);
+    document.getElementById('kpi-returned').textContent = String(returnedCount);
+    document.getElementById('n-claims').textContent = String(pendingN);
+    document.getElementById('n-intake').textContent = String(intake.length);
+    document.getElementById('n-broadcasts').textContent = String(broadcasts.length);
+  };
+
+  const renderDossier = () => {
+    const c = claims.find(x => x.id === selectedId) || claims[0];
+    if (!c) return;
+    document.getElementById('dossier-tag').textContent = c.tag;
+    document.getElementById('admin-item-name').textContent = c.item;
+    document.getElementById('admin-item-loc').textContent = `Found at ${c.loc}${c.shielded ? ' · ID Photo Shield unlocked for DO Admin' : ''}`;
+    document.getElementById('admin-media').innerHTML = c.img === 'assets/img/student_id.jpg'
+      ? `<img src="assets/img/wallet.webp" alt="${c.item}">`
+      : `<img src="${c.img}" alt="${c.item}">`;
+    document.getElementById('admin-specs').innerHTML = `
+      <div class="dossier-spec"><dt>Claimant</dt><dd>${c.claimant}</dd></div>
+      <div class="dossier-spec"><dt>Student ID</dt><dd class="mono">${c.sid}</dd></div>
+      <div class="dossier-spec"><dt>University email</dt><dd>${c.email}</dd></div>
+      <div class="dossier-spec"><dt>College &amp; program</dt><dd>${c.program}</dd></div>
+    `;
+    document.getElementById('admin-proof').textContent = c.proof;
+    const approveBtn = document.getElementById('approve-btn');
+    const denyBtn = document.getElementById('deny-btn');
+    approveBtn.disabled = c.status !== 'pending';
+    denyBtn.disabled = c.status !== 'pending';
+  };
+
+  const renderClaims = () => {
+    claimsQueue.innerHTML = '';
+    for (const c of claims) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ledger-row';
+      btn.setAttribute('aria-current', c.id === selectedId ? 'true' : 'false');
+      btn.innerHTML = `
+        <span class="ledger-main-col">
+          <span class="ledger-name">${c.item}</span>
+          <span class="ledger-sub">${c.loc} · <span class="ledger-tag">${c.tag}</span></span>
+        </span>
+        <span class="ledger-main-col ledger-claimant">
+          <span class="ledger-name">${c.claimant}</span>
+          <span class="ledger-sub mono">${c.sid}</span>
+        </span>
+        <span class="status-pill status-pill--${c.status}">${c.statusLabel}</span>
+      `;
+      btn.addEventListener('click', () => {
+        selectedId = c.id;
+        actionStatus.textContent = '';
+        renderClaims();
+        renderDossier();
+      });
+      claimsQueue.append(btn);
+    }
+    renderDossier();
+    syncCounts();
+  };
+
+  const renderIntake = () => {
+    intakeQueue.innerHTML = '';
+    if (!intake.length) {
+      intakeQueue.innerHTML = '<div class="intake-row"><span class="ledger-sub">All submitted found items have been confirmed in LSB Room 102 custody.</span></div>';
+    } else {
+      intake.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'intake-row';
+        row.innerHTML = `
+          <div>
+            <div class="ledger-name">${item.name}</div>
+            <div class="ledger-sub">${item.loc} · <span class="mono">${item.tag}</span> · ${item.reporter}</div>
+          </div>
+          <button type="button" class="btn btn--primary" data-intake-idx="${idx}">Confirm received</button>
+        `;
+        intakeQueue.append(row);
+      });
+      intakeQueue.querySelectorAll('[data-intake-idx]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          intake.splice(Number(btn.dataset.intakeIdx), 1);
+          custodyCount += 1;
+          renderIntake();
+          syncCounts();
+        });
+      });
+    }
+  };
+
+  const renderBroadcasts = () => {
+    broadcastList.innerHTML = '';
+    broadcasts.forEach((b, idx) => {
+      const row = document.createElement('div');
+      row.className = 'intake-row';
+      row.innerHTML = `
+        <div style="display:grid;gap:4px;">
+          <span class="status-pill status-pill--${b.pill}" style="justify-self:start;">${b.tier}</span>
+          <span style="font-size:var(--t-small);">${b.msg}</span>
+        </div>
+        <button type="button" class="btn btn--secondary" data-bc-del="${idx}">Remove</button>
+      `;
+      broadcastList.append(row);
+    });
+    broadcastList.querySelectorAll('[data-bc-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        broadcasts.splice(Number(btn.dataset.bcDel), 1);
+        renderBroadcasts();
+        syncCounts();
+      });
+    });
+  };
+
+  document.getElementById('approve-btn').addEventListener('click', () => {
+    const c = claims.find(x => x.id === selectedId);
+    if (!c || c.status !== 'pending') return;
+    c.status = 'verified';
+    c.statusLabel = 'Verified · Released';
+    custodyCount = Math.max(0, custodyCount - 1);
+    returnedCount += 1;
+    actionStatus.textContent = `Approved ${c.tag} for release to ${c.claimant}.`;
+    renderClaims();
+  });
+
+  document.getElementById('deny-btn').addEventListener('click', () => {
+    const c = claims.find(x => x.id === selectedId);
+    if (!c || c.status !== 'pending') return;
+    c.status = 'denied';
+    c.statusLabel = 'Denied';
+    actionStatus.textContent = `Denied claim on ${c.tag} and notified claimant.`;
+    renderClaims();
+  });
+
+  const bcForm = document.getElementById('broadcast-form');
+  bcForm.addEventListener('submit', e => {
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    const fd = new FormData(bcForm);
+    const tier = String(fd.get('tier') || 'Info');
+    const msg = String(fd.get('message') || '').trim();
+    const pill = tier === 'Alert' ? 'denied' : tier === 'Warning' ? 'pending' : 'info';
+    broadcasts.unshift({ tier, pill, msg });
+    bcForm.reset();
+    bcForm.querySelector('[data-form-status]').textContent = 'Broadcast published to campus ticker.';
+    renderBroadcasts();
+    syncCounts();
+  });
+
+  renderClaims();
+  renderIntake();
+  renderBroadcasts();
+})();
+</script>
+</body>
+</html>

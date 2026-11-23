@@ -1,0 +1,1598 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Report Modal Concepts (1–3) · LostLink DLSAU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f6f7f2;
+      --paper-2: #ecefe7;
+      --surface: #ffffff;
+      --ink: #0a0a0a;
+      --muted: #454545;
+      --forest: #1f6b3a;
+      --forest-hover: #19562e;
+      --forest-deep: #134e3a;
+      --forest-tint: #e7f3ea;
+      --forest-ink: #15522b;
+      --lime: #daef8a;
+      --lime-border: #c2d96c;
+      --amber-tint: #fef3c7;
+      --amber-ink: #7c3f05;
+      --line: rgba(10, 10, 10, 0.11);
+      --line-strong: rgba(10, 10, 10, 0.2);
+      --sans: "Outfit", system-ui, -apple-system, sans-serif;
+      --mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100svh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      font-variant-numeric: tabular-nums;
+      caret-color: var(--forest);
+      accent-color: var(--forest);
+    }
+
+    ::selection { background: rgba(31, 107, 58, 0.22); }
+    :focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+
+    /* ── Top Isolated Concept Switcher ── */
+    .switcher-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: #0a0a0a;
+      color: #ffffff;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .switcher-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .switcher-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--lime);
+      background: rgba(218, 239, 138, 0.12);
+      border: 1px solid rgba(218, 239, 138, 0.28);
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .switcher-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tab-btn {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: transparent;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
+    }
+
+    .tab-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
+    .tab-btn[aria-selected="true"] {
+      background: var(--lime);
+      border-color: var(--lime);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .tab-btn .num {
+      font-family: var(--mono);
+      font-size: 11px;
+      opacity: 0.75;
+    }
+
+    .switcher-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tool-btn {
+      min-height: 44px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 150ms var(--ease);
+    }
+
+    .tool-btn:hover { background: rgba(255, 255, 255, 0.14); }
+    .tool-btn[aria-pressed="true"] {
+      background: var(--forest);
+      border-color: var(--forest);
+    }
+
+    /* ── Realistic Campus Feed Stage Backdrop ── */
+    .stage {
+      position: relative;
+      min-height: calc(100svh - 65px);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      padding: 28px 20px;
+    }
+
+    .stage.is-drawer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: stretch;
+      padding: 0;
+    }
+
+    .backdrop-feed {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      user-select: none;
+      overflow: hidden;
+      background: var(--paper);
+    }
+
+    .backdrop-feed__inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 48px;
+      opacity: 0.92;
+      filter: blur(1.5px);
+    }
+
+    .bf-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .bf-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .bf-brand img { width: 38px; height: 38px; }
+
+    .bf-hero {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: 1.7fr 1fr;
+      gap: 16px;
+    }
+
+    .bf-card {
+      background: #ffffff;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      min-height: 230px;
+    }
+
+    .bf-card img { width: 100%; height: 100%; object-fit: cover; }
+
+    .bf-desk {
+      background: var(--forest-deep);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 22px;
+    }
+
+    .bf-grid {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .bf-tile {
+      aspect-ratio: 4/3;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      background: var(--paper-2);
+    }
+
+    .bf-tile img { width: 100%; height: 100%; object-fit: cover; }
+
+    .backdrop-scrim {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 10, 10, 0.52);
+      backdrop-filter: blur(2px);
+    }
+
+    .concept-host {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .stage.is-drawer .concept-host {
+      justify-content: flex-end;
+      min-height: calc(100svh - 65px);
+    }
+
+    .concept-pane { display: none; width: 100%; justify-content: center; }
+    .concept-pane.active { display: flex; animation: enter 200ms var(--ease) both; }
+    .stage.is-drawer .concept-pane.active { justify-content: flex-end; }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(8px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes drawerIn {
+      from { opacity: 0; transform: translateX(24px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .stage.is-drawer .concept-pane.active { animation-name: drawerIn; }
+
+    /* ── Shared High-Craft Controls ── */
+    .field-group { display: grid; gap: 6px; }
+    .field-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .field-meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .field-meta.ready { color: var(--forest); }
+
+    .input-ctrl, .select-ctrl, .textarea-ctrl {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 15px;
+      transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease), background 150ms var(--ease);
+    }
+    .input-ctrl, .select-ctrl { height: 44px; padding: 0 13px; }
+    .textarea-ctrl { min-height: 88px; padding: 10px 13px; line-height: 1.5; resize: vertical; }
+    .input-ctrl:hover, .select-ctrl:hover, .textarea-ctrl:hover { border-color: rgba(10, 10, 10, 0.38); }
+    .input-ctrl:focus, .select-ctrl:focus, .textarea-ctrl:focus {
+      outline: none;
+      border-color: var(--forest);
+      box-shadow: 0 0 0 3px rgba(31, 107, 58, 0.16);
+    }
+    .input-ctrl::placeholder, .textarea-ctrl::placeholder { color: #686868; }
+
+    .select-wrap { position: relative; }
+    .select-ctrl { appearance: none; padding-right: 36px; cursor: pointer; }
+    .select-caret {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--muted);
+    }
+
+    .icon-close {
+      width: 44px;
+      height: 44px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 150ms var(--ease), color 150ms var(--ease);
+    }
+    .icon-close:hover { background: rgba(10, 10, 10, 0.06); color: var(--ink); }
+    .icon-close--dark { color: rgba(255, 255, 255, 0.78); }
+    .icon-close--dark:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; }
+
+    .btn-primary {
+      min-height: 44px;
+      padding: 0 20px;
+      border-radius: 8px;
+      border: 0;
+      background: var(--forest);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 150ms var(--ease), transform 100ms var(--ease);
+    }
+    .btn-primary:hover { background: var(--forest-hover); }
+    .btn-primary:active { transform: translateY(1px); }
+
+    .btn-lime {
+      min-height: 44px;
+      padding: 0 20px;
+      border-radius: 8px;
+      border: 1px solid var(--lime-border);
+      background: var(--lime);
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 150ms var(--ease), transform 100ms var(--ease);
+    }
+    .btn-lime:hover { background: #cde472; }
+    .btn-lime:active { transform: translateY(1px); }
+
+    .btn-secondary {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 8px;
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 150ms var(--ease);
+    }
+    .btn-secondary:hover { background: var(--paper-2); }
+
+    .shield-banner {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      border-radius: 8px;
+      background: var(--forest-tint);
+      color: var(--forest-ink);
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .shield-banner.visible { display: flex; }
+
+    /* ════════════════════════════════════════════════════════
+       MOCKUP 1: SPLIT CUSTODY DESK (860px Deep Forest Rail + Form)
+       ════════════════════════════════════════════════════════ */
+    .m1-modal {
+      width: min(100%, 880px);
+      background: var(--surface);
+      border-radius: 16px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 310px minmax(0, 1fr);
+      box-shadow: 0 28px 64px -16px rgba(10, 10, 10, 0.36);
+    }
+
+    .m1-rail {
+      background: var(--forest-deep);
+      color: #ffffff;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .m1-rail__top { display: grid; gap: 18px; }
+
+    .m1-rail__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .m1-ref {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--lime);
+      background: rgba(218, 239, 138, 0.12);
+      border: 1px solid rgba(218, 239, 138, 0.28);
+      padding: 4px 9px;
+      border-radius: 6px;
+    }
+
+    .m1-rail h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+    }
+
+    .m1-rail__lead {
+      margin: 6px 0 0;
+      font-size: 13.5px;
+      line-height: 1.48;
+      color: #d6e7dd;
+    }
+
+    /* Live Feed Card Preview inside Forest Rail */
+    .m1-preview {
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .m1-preview__media {
+      position: relative;
+      aspect-ratio: 4/3;
+      background: var(--paper-2);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .m1-preview__media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .m1-preview__empty {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      padding: 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .m1-preview__badges {
+      position: absolute;
+      inset: 10px 10px auto 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid #c2dec9;
+      background: var(--forest-tint);
+      color: var(--forest-ink);
+    }
+
+    .pill-status.lost {
+      border-color: #f4d68c;
+      background: var(--amber-tint);
+      color: var(--amber-ink);
+    }
+
+    .pill-code {
+      font-family: var(--mono);
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--ink);
+      padding: 3px 7px;
+      border-radius: 6px;
+    }
+
+    .m1-preview__body { padding: 12px 14px; }
+    .m1-preview__title {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.25;
+      margin: 0;
+      color: var(--ink);
+    }
+    .m1-preview__meta {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .m1-desk-note {
+      border-top: 1px solid rgba(255, 255, 255, 0.14);
+      padding-top: 14px;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: #d6e7dd;
+    }
+
+    .m1-desk-note strong {
+      display: block;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--lime);
+      margin-bottom: 3px;
+    }
+
+    .m1-form-col {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+    }
+
+    .m1-form-head {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .m1-mode-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .m1-mode-btn {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 150ms var(--ease);
+    }
+    .m1-mode-btn:hover { background: var(--paper); color: var(--ink); }
+    .m1-mode-btn.is-found[aria-pressed="true"] {
+      background: var(--forest);
+      border-color: var(--forest);
+      color: #ffffff;
+    }
+    .m1-mode-btn.is-lost[aria-pressed="true"] {
+      background: var(--lime);
+      border-color: var(--lime-border);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .m1-form-body {
+      padding: 20px 24px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .m1-photo-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .photo-slot {
+      position: relative;
+      aspect-ratio: 4/3;
+      border-radius: 10px;
+      border: 1.5px dashed var(--line-strong);
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      overflow: hidden;
+      text-align: center;
+      padding: 8px;
+      transition: border-color 150ms var(--ease), background 150ms var(--ease);
+    }
+
+    .photo-slot:hover { border-color: var(--forest); background: #eff4ec; }
+    .photo-slot.has-img { border-style: solid; border-color: var(--line-strong); padding: 0; }
+    .photo-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo-slot__num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .photo-slot__rm {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 0;
+      background: rgba(10, 10, 10, 0.78);
+      color: #ffffff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .m1-form-foot {
+      margin-top: auto;
+      padding: 14px 24px;
+      border-top: 1px solid var(--line);
+      background: var(--paper);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    /* ════════════════════════════════════════════════════════
+       MOCKUP 2: RIGHT-EDGE ARCHITECTURAL DRAWER (540px Full Height)
+       ════════════════════════════════════════════════════════ */
+    .m2-drawer {
+      width: min(100%, 560px);
+      height: calc(100svh - 65px);
+      max-height: calc(100svh - 65px);
+      background: var(--paper);
+      border-left: 1px solid var(--line-strong);
+      box-shadow: -20px 0 48px -12px rgba(10, 10, 10, 0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .m2-head {
+      padding: 20px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .m2-head h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .m2-head p {
+      margin: 4px 0 0;
+      font-size: 13.5px;
+      color: var(--muted);
+    }
+
+    .m2-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    .m2-band {
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 14px;
+    }
+
+    .m2-band:last-child { border-bottom: 0; }
+
+    .m2-toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .m2-toggle-card {
+      min-height: 64px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      transition: all 150ms var(--ease);
+    }
+
+    .m2-toggle-card strong { font-size: 14.5px; font-weight: 600; }
+    .m2-toggle-card span { font-size: 12px; color: var(--muted); }
+
+    .m2-toggle-card.is-found[aria-pressed="true"] {
+      background: var(--forest-deep);
+      border-color: var(--forest-deep);
+      color: #ffffff;
+    }
+    .m2-toggle-card.is-found[aria-pressed="true"] span { color: #d6e7dd; }
+
+    .m2-toggle-card.is-lost[aria-pressed="true"] {
+      background: var(--lime);
+      border-color: var(--lime-border);
+      color: var(--ink);
+    }
+    .m2-toggle-card.is-lost[aria-pressed="true"] span { color: #2b3314; }
+
+    .chip-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .chip-btn {
+      min-height: 44px;
+      padding: 0 13px;
+      border-radius: 8px;
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 140ms var(--ease);
+    }
+    .chip-btn:hover { background: var(--paper-2); }
+    .chip-btn[aria-pressed="true"] {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #ffffff;
+    }
+
+    .m2-foot {
+      padding: 16px 28px;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    /* ════════════════════════════════════════════════════════
+       MOCKUP 3: MEDIA-FIRST BENTO STUDIO (860px Dark Bar + 4:3 Stage)
+       ════════════════════════════════════════════════════════ */
+    .m3-modal {
+      width: min(100%, 880px);
+      background: var(--paper);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 28px 64px -16px rgba(10, 10, 10, 0.38);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .m3-topbar {
+      background: #0a0a0a;
+      color: #ffffff;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .m3-topbar__left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .m3-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--lime);
+      flex: none;
+    }
+
+    .m3-topbar h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .m3-topbar__tag {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--lime);
+      opacity: 0.9;
+    }
+
+    .m3-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.15fr);
+    }
+
+    .m3-media-col {
+      padding: 22px;
+      background: var(--paper);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .m3-stage {
+      position: relative;
+      aspect-ratio: 4/3;
+      border-radius: 12px;
+      border: 1.5px dashed var(--line-strong);
+      background: var(--surface);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 20px;
+      cursor: pointer;
+      transition: border-color 150ms var(--ease), background 150ms var(--ease);
+    }
+
+    .m3-stage:hover { border-color: var(--forest); background: #f3f7f1; }
+    .m3-stage.has-img { border-style: solid; border-color: var(--line-strong); padding: 0; }
+    .m3-stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .m3-stage__shield {
+      position: absolute;
+      inset: 0;
+      background: var(--paper-2);
+      display: none;
+      place-items: center;
+      padding: 20px;
+      text-align: center;
+    }
+    .m3-stage__shield.visible { display: grid; }
+
+    .m3-thumbs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .m3-thumb {
+      aspect-ratio: 4/3;
+      border-radius: 8px;
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .m3-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .m3-thumb.active { border: 2px solid var(--forest); }
+
+    .m3-details-col {
+      padding: 22px 24px;
+      background: var(--surface);
+      display: grid;
+      align-content: start;
+      gap: 15px;
+    }
+
+    .m3-meter {
+      height: 3px;
+      border-radius: 999px;
+      background: var(--paper-2);
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .m3-meter__fill {
+      height: 100%;
+      width: 0%;
+      background: var(--forest);
+      transition: width 160ms var(--ease);
+    }
+
+    .m3-foot {
+      padding: 14px 24px;
+      border-top: 1px solid var(--line);
+      background: var(--paper);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 820px) {
+      .m1-modal, .m3-grid { grid-template-columns: 1fr; }
+      .m1-rail { padding: 18px 20px; }
+      .m3-media-col { border-right: 0; border-bottom: 1px solid var(--line); }
+      .field-row-2 { grid-template-columns: 1fr; }
+      .m2-head, .m2-band, .m2-foot { padding-inline: 18px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .concept-pane.active { animation: none; }
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Isolated Switcher Header (Delete folder to remove cleanly) -->
+  <nav class="switcher-bar" aria-label="Mockup concept switcher">
+    <div class="switcher-title">
+      <span>Report Modal Concepts</span>
+      <span class="switcher-badge">ISOLATED · design/report-modal-mockups</span>
+    </div>
+
+    <div class="switcher-tabs" role="tablist">
+      <button type="button" role="tab" class="tab-btn" data-concept="1" aria-selected="true">
+        <span class="num">01</span> Split Custody Desk
+      </button>
+      <button type="button" role="tab" class="tab-btn" data-concept="2" aria-selected="false">
+        <span class="num">02</span> Right-Edge Drawer
+      </button>
+      <button type="button" role="tab" class="tab-btn" data-concept="3" aria-selected="false">
+        <span class="num">03</span> Media-First Bento
+      </button>
+    </div>
+
+    <div class="switcher-tools">
+      <button type="button" class="tool-btn" id="toggle-sample-photos" aria-pressed="false">
+        Load sample photos
+      </button>
+      <button type="button" class="tool-btn" id="toggle-id-shield" aria-pressed="false">
+        Preview ID Shield
+      </button>
+    </div>
+  </nav>
+
+  <!-- Realistic Campus Feed Backdrop + Active Concept -->
+  <main class="stage" id="stage">
+    <div class="backdrop-feed" aria-hidden="true">
+      <div class="backdrop-feed__inner">
+        <div class="bf-nav">
+          <div class="bf-brand">
+            <img data-asset="dlsau-logo.svg" alt="">
+            <img data-asset="lostlink-badge.svg" alt="">
+            <span>LostLink</span>
+          </div>
+          <span style="font-size:14px;color:var(--muted);">Campus Feed · My Activity</span>
+        </div>
+        <div class="bf-hero">
+          <div class="bf-card">
+            <img data-asset="keys.webp" alt="">
+            <div style="padding:20px;">
+              <div style="font-size:20px;font-weight:600;">DLSAU Keychain &amp; Dorm Fob</div>
+              <p style="font-size:14px;color:var(--muted);margin-top:8px;">Found near Library 2F reading tables.</p>
+            </div>
+          </div>
+          <div class="bf-desk">
+            <div style="font-size:17px;font-weight:600;">LSB Room 102 Desk</div>
+            <p style="font-size:13px;color:#d6e7dd;margin-top:6px;">Open Mon–Fri, 8:00 AM–5:00 PM. IDs, Cards &amp; Wallets shield photos automatically.</p>
+          </div>
+        </div>
+        <div class="bf-grid">
+          <div class="bf-tile"><img data-asset="water_bottle.webp" alt=""></div>
+          <div class="bf-tile"><img data-asset="earbuds.webp" alt=""></div>
+          <div class="bf-tile"><img data-asset="backpack.webp" alt=""></div>
+        </div>
+      </div>
+    </div>
+    <div class="backdrop-scrim" aria-hidden="true"></div>
+
+    <div class="concept-host">
+
+      <!-- ═══════════════════════════════════════════════════
+           CONCEPT 1: SPLIT CUSTODY DESK (Live Feed Card Preview)
+           ═══════════════════════════════════════════════════ -->
+      <section class="concept-pane active" data-pane="1" aria-label="Concept 1: Split Custody Desk">
+        <div class="m1-modal">
+          <aside class="m1-rail">
+            <div class="m1-rail__top">
+              <div class="m1-rail__head">
+                <span class="m1-ref">DRAFT · LL-4892</span>
+              </div>
+              <div>
+                <h2 data-bind="headline">Post a lost alert</h2>
+                <p class="m1-rail__lead" data-bind="sub">
+                  Publishes immediately to the campus feed so finders across 17 DLSAU buildings can reach you.
+                </p>
+              </div>
+
+              <!-- Live Preview Card -->
+              <div class="m1-preview" aria-label="Live listing card preview">
+                <div class="m1-preview__media" data-preview-media="1">
+                  <div class="m1-preview__badges">
+                    <span class="pill-status lost" data-bind="pill">Lost report</span>
+                    <span class="pill-code">LL-4892</span>
+                  </div>
+                  <div class="m1-preview__empty" data-preview-empty="1">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    <span>Live feed preview updates as you type</span>
+                  </div>
+                </div>
+                <div class="m1-preview__body">
+                  <p class="m1-preview__title" data-bind="previewTitle">Black Hydroflask 32oz</p>
+                  <p class="m1-preview__meta" data-bind="previewMeta">Library 2F · Electronics · Today</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="m1-desk-note">
+              <strong>LSB ROOM 102 CUSTODY DESK</strong>
+              Mon–Fri, 8:00 AM–5:00 PM · Bring your DLSAU ID for physical turn-ins and verified pickups.
+            </div>
+          </aside>
+
+          <div class="m1-form-col">
+            <div class="m1-form-head">
+              <div class="m1-mode-row" role="group" aria-label="Report type">
+                <button type="button" class="m1-mode-btn is-found" data-set-type="found" aria-pressed="false">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 2 2 4-4"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+                  Found item
+                </button>
+                <button type="button" class="m1-mode-btn is-lost" data-set-type="lost" aria-pressed="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  Lost item
+                </button>
+              </div>
+              <button type="button" class="icon-close" aria-label="Close preview">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+
+            <div class="m1-form-body">
+              <div class="field-group">
+                <label class="field-label" for="m1-name">Item name</label>
+                <input id="m1-name" class="input-ctrl" data-sync="name" type="text" placeholder="e.g. Black Hydroflask, DLSAU ID Lace">
+              </div>
+
+              <div class="field-row-2">
+                <div class="field-group">
+                  <label class="field-label" for="m1-cat">Category</label>
+                  <div class="select-wrap">
+                    <select id="m1-cat" class="select-ctrl" data-sync="category"></select>
+                    <svg class="select-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="m1-loc">Campus building</label>
+                  <div class="select-wrap">
+                    <select id="m1-loc" class="select-ctrl" data-sync="location"></select>
+                    <svg class="select-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              </div>
+
+              <div class="shield-banner" data-shield-note>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:2px;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span>ID Photo Shield active: public gallery hides personal photos automatically.</span>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label">
+                  <span>Photos <span style="font-weight:400;color:var(--muted);" data-bind="photoOpt">(optional, up to 3)</span></span>
+                  <span class="field-meta" data-bind="photoCount">0 / 3</span>
+                </div>
+                <div class="m1-photo-strip" data-slots="1"></div>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label">
+                  <label for="m1-desc">Description</label>
+                  <span class="field-meta" data-bind="descCount">0 / 10 min</span>
+                </div>
+                <textarea id="m1-desc" class="textarea-ctrl" data-sync="description" placeholder="Color, brand, stickers, or where you last saw it…"></textarea>
+              </div>
+            </div>
+
+            <div class="m1-form-foot">
+              <button type="button" class="btn-secondary">Cancel</button>
+              <button type="button" class="btn-primary" data-bind="cta">Publish lost alert</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           CONCEPT 2: RIGHT-EDGE ARCHITECTURAL DRAWER
+           ═══════════════════════════════════════════════════ -->
+      <section class="concept-pane" data-pane="2" aria-label="Concept 2: Right-Edge Architectural Drawer">
+        <div class="m2-drawer">
+          <div class="m2-head">
+            <div>
+              <h2 data-bind="headline">Post a lost alert</h2>
+              <p data-bind="sub">Publishes immediately across all 17 DLSAU buildings.</p>
+            </div>
+            <button type="button" class="icon-close" aria-label="Close drawer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+
+          <div class="m2-body">
+            <!-- Band 1: Mode -->
+            <div class="m2-band">
+              <div class="m2-toggle-grid" role="group" aria-label="Report type">
+                <button type="button" class="m2-toggle-card is-found" data-set-type="found" aria-pressed="false">
+                  <strong>Found an item</strong>
+                  <span>Log tag &amp; turn in at LSB 102</span>
+                </button>
+                <button type="button" class="m2-toggle-card is-lost" data-set-type="lost" aria-pressed="true">
+                  <strong>Lost an item</strong>
+                  <span>Post alert to Campus Feed</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Band 2: What & Where (Quick-Tap Chips!) -->
+            <div class="m2-band">
+              <div class="field-group">
+                <label class="field-label" for="m2-name">Item name</label>
+                <input id="m2-name" class="input-ctrl" data-sync="name" type="text" placeholder="e.g. Black Hydroflask, DLSAU ID Lace">
+              </div>
+
+              <div class="field-group">
+                <span class="field-label">Quick building pick <span class="field-meta">or select below</span></span>
+                <div class="chip-wrap" data-building-chips></div>
+                <div class="select-wrap" style="margin-top:4px;">
+                  <select class="select-ctrl" data-sync="location" aria-label="All 17 campus buildings"></select>
+                  <svg class="select-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <span class="field-label">Category</span>
+                <div class="chip-wrap" data-category-chips></div>
+              </div>
+
+              <div class="shield-banner" data-shield-note>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:2px;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span>ID Photo Shield active: personal photos stay hidden on the public feed.</span>
+              </div>
+            </div>
+
+            <!-- Band 3: 3-Slot Filmstrip Photos -->
+            <div class="m2-band">
+              <div class="field-label">
+                <span>Photos <span style="font-weight:400;color:var(--muted);" data-bind="photoOpt">(optional, up to 3)</span></span>
+                <span class="field-meta" data-bind="photoCount">0 / 3</span>
+              </div>
+              <div class="m1-photo-strip" data-slots="2"></div>
+            </div>
+
+            <!-- Band 4: Description -->
+            <div class="m2-band">
+              <div class="field-group">
+                <div class="field-label">
+                  <label for="m2-desc">Description</label>
+                  <span class="field-meta" data-bind="descCount">0 / 10 min</span>
+                </div>
+                <textarea id="m2-desc" class="textarea-ctrl" data-sync="description" placeholder="Color, brand, stickers, or exact room/table where seen…"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="m2-foot">
+            <button type="button" class="btn-secondary">Cancel</button>
+            <button type="button" class="btn-primary" style="flex:1;" data-bind="cta">Publish lost alert</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           CONCEPT 3: MEDIA-FIRST BENTO STUDIO
+           ═══════════════════════════════════════════════════ -->
+      <section class="concept-pane" data-pane="3" aria-label="Concept 3: Media-First Bento Studio">
+        <div class="m3-modal">
+          <div class="m3-topbar">
+            <div class="m3-topbar__left">
+              <span class="m3-dot" aria-hidden="true"></span>
+              <h2 data-bind="headline">Post a lost alert</h2>
+              <span class="m3-topbar__tag">· LL-DRAFT</span>
+            </div>
+            <button type="button" class="icon-close icon-close--dark" aria-label="Close modal">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+
+          <div class="m3-grid">
+            <!-- Left: Media Stage -->
+            <div class="m3-media-col">
+              <div class="field-label">
+                <span>Item gallery</span>
+                <span class="field-meta" data-bind="photoCount">0 / 3</span>
+              </div>
+
+              <div class="m3-stage" id="m3-stage" role="button" tabindex="0">
+                <div id="m3-stage-empty" style="display:grid;justify-items:center;gap:8px;">
+                  <span style="width:44px;height:44px;border-radius:10px;background:var(--paper);border:1px solid var(--line);display:grid;place-items:center;color:var(--forest);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><line x1="16" x2="22" y1="5" y2="5"/><line x1="19" x2="19" y1="2" y2="8"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  </span>
+                  <strong style="font-size:14.5px;font-weight:600;">Drop up to 3 item photos</strong>
+                  <span style="font-size:12.5px;color:var(--muted);">PNG, JPG, WebP · Max 5 MB · Click to upload</span>
+                </div>
+                <img id="m3-stage-img" src="" alt="Selected item preview" style="display:none;">
+                <div class="m3-stage__shield" id="m3-shield-overlay">
+                  <div style="display:grid;justify-items:center;gap:6px;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1f6b3a" stroke-width="1.8"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+                    <strong style="font-size:15px;">ID Photo Shield Active</strong>
+                    <span style="font-size:12.5px;color:var(--muted);max-width:24ch;">Photos remain private to LSB Room 102 Security only.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="m3-thumbs" id="m3-thumbs"></div>
+
+              <p style="margin:auto 0 0;font-size:12.5px;line-height:1.45;color:var(--muted);">
+                Clear daylight photos help owners verify items faster at LSB Room 102.
+              </p>
+            </div>
+
+            <!-- Right: Fast Intake Details -->
+            <div class="m3-details-col">
+              <div class="m1-mode-row" role="group" aria-label="Report type">
+                <button type="button" class="m1-mode-btn is-found" style="flex:1;justify-content:center;" data-set-type="found" aria-pressed="false">Found item</button>
+                <button type="button" class="m1-mode-btn is-lost" style="flex:1;justify-content:center;" data-set-type="lost" aria-pressed="true">Lost item</button>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label" for="m3-name">Item name</label>
+                <input id="m3-name" class="input-ctrl" data-sync="name" type="text" placeholder="e.g. Black Hydroflask, DLSAU ID Lace">
+              </div>
+
+              <div class="field-row-2">
+                <div class="field-group">
+                  <label class="field-label" for="m3-cat">Category</label>
+                  <div class="select-wrap">
+                    <select id="m3-cat" class="select-ctrl" data-sync="category"></select>
+                    <svg class="select-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="m3-loc">Campus building</label>
+                  <div class="select-wrap">
+                    <select id="m3-loc" class="select-ctrl" data-sync="location"></select>
+                    <svg class="select-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label">
+                  <label for="m3-desc">Description</label>
+                  <span class="field-meta" data-bind="descCount">0 / 10 min</span>
+                </div>
+                <textarea id="m3-desc" class="textarea-ctrl" data-sync="description" placeholder="Color, brand, distinct marks, or exact location…"></textarea>
+                <div class="m3-meter"><div class="m3-meter__fill" id="m3-meter-fill"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="m3-foot">
+            <span class="field-meta" data-bind="footNote">Instant public alert · 17 DLSAU buildings</span>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn-secondary">Cancel</button>
+              <button type="button" class="btn-primary" data-bind="cta">Publish lost alert</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <input type="file" id="hidden-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden>
+
+  <script>
+    const CATEGORIES = [
+      'IDs, Cards & Wallets',
+      'Electronics',
+      'Keys & Lanyards',
+      'Bags & Pouches',
+      'Books & Notebooks',
+      'Drinkware & Personal'
+    ];
+    const BUILDINGS = [
+      'Library 2F',
+      'Gate 2',
+      'DVM Building',
+      '2nd Cafeteria',
+      'Life Science Building (LSB)',
+      'Admin Building',
+      'Salikneta Hall',
+      'St. Benilde Hall'
+    ];
+    const ASSET_BASE = location.protocol === 'file:' ? '../../public/assets/img/' : '/assets/img/';
+    document.querySelectorAll('img[data-asset]').forEach((img) => {
+      img.src = ASSET_BASE + img.dataset.asset;
+    });
+
+    const HOTSPOTS = ['Library 2F', 'Gate 2', 'DVM Building', '2nd Cafeteria'];
+    const SAMPLE_PHOTOS = [
+      ASSET_BASE + 'water_bottle.webp',
+      ASSET_BASE + 'keys.webp',
+      ASSET_BASE + 'earbuds.webp'
+    ];
+
+    const state = {
+      concept: '1',
+      type: 'lost',
+      name: '',
+      category: 'Electronics',
+      location: 'Library 2F',
+      description: '',
+      photos: [],
+      activeThumb: 0
+    };
+
+    // Populate selects
+    document.querySelectorAll('select[data-sync="category"]').forEach((sel) => {
+      sel.innerHTML = CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join('');
+    });
+    document.querySelectorAll('select[data-sync="location"]').forEach((sel) => {
+      sel.innerHTML = BUILDINGS.map((b) => `<option value="${b}">${b}</option>`).join('');
+    });
+
+    // Render Concept 2 quick-tap chips
+    const bChips = document.querySelector('[data-building-chips]');
+    bChips.innerHTML = HOTSPOTS.map((b) => `<button type="button" class="chip-btn" data-chip-loc="${b}" aria-pressed="false">${b}</button>`).join('');
+    const cChips = document.querySelector('[data-category-chips]');
+    cChips.innerHTML = CATEGORIES.map((c) => `<button type="button" class="chip-btn" data-chip-cat="${c}" aria-pressed="false">${c}</button>`).join('');
+
+    const fileInput = document.getElementById('hidden-file-input');
+
+    function render() {
+      const isFound = state.type === 'found';
+      const isShield = state.category === 'IDs, Cards & Wallets';
+      const descLen = state.description.trim().length;
+
+      // Stage mode
+      const stage = document.getElementById('stage');
+      stage.classList.toggle('is-drawer', state.concept === '2');
+
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.setAttribute('aria-selected', String(btn.dataset.concept === state.concept));
+      });
+      document.querySelectorAll('.concept-pane').forEach((p) => {
+        p.classList.toggle('active', p.dataset.pane === state.concept);
+      });
+
+      // Toggle buttons
+      document.querySelectorAll('[data-set-type]').forEach((btn) => {
+        btn.setAttribute('aria-pressed', String(btn.dataset.setType === state.type));
+      });
+
+      // Synced inputs
+      document.querySelectorAll('[data-sync="name"]').forEach((el) => { if (el.value !== state.name) el.value = state.name; });
+      document.querySelectorAll('[data-sync="category"]').forEach((el) => { el.value = state.category; });
+      document.querySelectorAll('[data-sync="location"]').forEach((el) => { el.value = state.location; });
+      document.querySelectorAll('[data-sync="description"]').forEach((el) => { if (el.value !== state.description) el.value = state.description; });
+
+      // Chips
+      document.querySelectorAll('[data-chip-loc]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chipLoc === state.location)));
+      document.querySelectorAll('[data-chip-cat]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chipCat === state.category)));
+
+      // Dynamic copy
+      document.querySelectorAll('[data-bind="headline"]').forEach((el) => {
+        el.textContent = isFound ? 'Log a found item' : 'Post a lost alert';
+      });
+      document.querySelectorAll('[data-bind="sub"]').forEach((el) => {
+        el.textContent = isFound
+          ? 'Logs a custody reference tag for physical drop-off at LSB Room 102.'
+          : 'Publishes immediately across all 17 DLSAU buildings so finders can reach you.';
+      });
+      document.querySelectorAll('[data-bind="cta"]').forEach((el) => {
+        el.textContent = isFound ? 'Submit found report' : 'Publish lost alert';
+        el.className = isFound ? 'btn-primary' : (state.concept === '1' ? 'btn-lime' : 'btn-primary');
+        if (state.concept === '2') el.style.flex = '1';
+      });
+      document.querySelectorAll('[data-bind="photoOpt"]').forEach((el) => {
+        el.textContent = isFound ? '(1–3 images)' : '(optional, up to 3)';
+      });
+      document.querySelectorAll('[data-bind="photoCount"]').forEach((el) => {
+        el.textContent = `${state.photos.length} / 3`;
+      });
+      document.querySelectorAll('[data-bind="descCount"]').forEach((el) => {
+        el.textContent = `${descLen} / 10 min`;
+        el.classList.toggle('ready', descLen >= 10);
+      });
+      document.querySelectorAll('[data-bind="footNote"]').forEach((el) => {
+        el.textContent = isFound ? 'LSB Room 102 custody intake' : 'Instant public alert · 17 DLSAU buildings';
+      });
+
+      // Shield notices
+      document.querySelectorAll('[data-shield-note]').forEach((el) => el.classList.toggle('visible', isShield));
+      document.getElementById('toggle-id-shield').setAttribute('aria-pressed', String(isShield));
+      document.getElementById('toggle-sample-photos').setAttribute('aria-pressed', String(state.photos.length > 0));
+      document.getElementById('toggle-sample-photos').textContent = state.photos.length > 0 ? 'Clear sample photos' : 'Load sample photos';
+
+      // Concept 1 Live Card Preview
+      const pill = document.querySelector('[data-bind="pill"]');
+      pill.textContent = isFound ? 'In custody' : 'Lost report';
+      pill.classList.toggle('lost', !isFound);
+      document.querySelector('[data-bind="previewTitle"]').textContent = state.name.trim() || 'Black Hydroflask 32oz';
+      document.querySelector('[data-bind="previewMeta"]').textContent = `${state.location} · ${state.category} · Today`;
+
+      const pMedia = document.querySelector('[data-preview-media="1"]');
+      const existingImg = pMedia.querySelector('img');
+      const existingShield = pMedia.querySelector('.m1-shield-live');
+      const pEmpty = document.querySelector('[data-preview-empty="1"]');
+      if (existingImg) existingImg.remove();
+      if (existingShield) existingShield.remove();
+
+      if (isShield) {
+        pEmpty.style.display = 'none';
+        const s = document.createElement('div');
+        s.className = 'm1-shield-live';
+        s.style.cssText = 'display:grid;justify-items:center;gap:5px;padding:16px;text-align:center;';
+        s.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f6b3a" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg><strong style="font-size:13px;">ID Photo Shield Active</strong><span style="font-size:11.5px;color:var(--muted);">Visible to Security only</span>`;
+        pMedia.appendChild(s);
+      } else if (state.photos[0]) {
+        pEmpty.style.display = 'none';
+        const img = document.createElement('img');
+        img.src = state.photos[0];
+        img.alt = 'Preview';
+        pMedia.prepend(img);
+      } else {
+        pEmpty.style.display = 'grid';
+      }
+
+      // Render 3-slot photo trays (Concepts 1 & 2)
+      document.querySelectorAll('[data-slots]').forEach((wrap) => {
+        wrap.innerHTML = [0, 1, 2].map((i) => {
+          const src = state.photos[i];
+          if (src) {
+            return `<div class="photo-slot has-img">
+              <img src="${src}" alt="Photo ${i + 1}">
+              <button type="button" class="photo-slot__rm" data-remove-photo="${i}" aria-label="Remove photo ${i + 1}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>`;
+          }
+          return `<button type="button" class="photo-slot" data-add-photo>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1f6b3a" stroke-width="1.8"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            <span class="photo-slot__num">Slot ${i + 1}</span>
+          </button>`;
+        }).join('');
+      });
+
+      // Concept 3 Media Stage + Thumbs + Meter
+      const stageEl = document.getElementById('m3-stage');
+      const stageImg = document.getElementById('m3-stage-img');
+      const stageEmpty = document.getElementById('m3-stage-empty');
+      const shieldOv = document.getElementById('m3-shield-overlay');
+      const activeSrc = state.photos[state.activeThumb] || state.photos[0];
+      shieldOv.classList.toggle('visible', isShield);
+      stageEl.classList.toggle('has-img', Boolean(activeSrc) && !isShield);
+      stageImg.style.display = activeSrc && !isShield ? 'block' : 'none';
+      if (activeSrc) stageImg.src = activeSrc;
+      stageEmpty.style.display = !activeSrc && !isShield ? 'grid' : 'none';
+
+      document.getElementById('m3-thumbs').innerHTML = [0, 1, 2].map((i) => {
+        const src = state.photos[i];
+        if (src) {
+          return `<button type="button" class="m3-thumb ${i === state.activeThumb ? 'active' : ''}" data-pick-thumb="${i}"><img src="${src}" alt="Thumb ${i + 1}"></button>`;
+        }
+        return `<button type="button" class="m3-thumb" data-add-photo>+ ${i + 1}</button>`;
+      }).join('');
+
+      document.getElementById('m3-meter-fill').style.width = `${Math.min(100, (descLen / 10) * 100)}%`;
+    }
+
+    // Global delegated events
+    document.addEventListener('click', (e) => {
+      const tab = e.target.closest('.tab-btn');
+      if (tab) { state.concept = tab.dataset.concept; render(); return; }
+
+      const typeBtn = e.target.closest('[data-set-type]');
+      if (typeBtn) { state.type = typeBtn.dataset.setType; render(); return; }
+
+      const locChip = e.target.closest('[data-chip-loc]');
+      if (locChip) { state.location = locChip.dataset.chipLoc; render(); return; }
+
+      const catChip = e.target.closest('[data-chip-cat]');
+      if (catChip) { state.category = catChip.dataset.chipCat; render(); return; }
+
+      const rm = e.target.closest('[data-remove-photo]');
+      if (rm) {
+        state.photos.splice(Number(rm.dataset.removePhoto), 1);
+        state.activeThumb = Math.max(0, Math.min(state.activeThumb, state.photos.length - 1));
+        render();
+        return;
+      }
+
+      const pick = e.target.closest('[data-pick-thumb]');
+      if (pick) { state.activeThumb = Number(pick.dataset.pickThumb); render(); return; }
+
+      if (e.target.closest('[data-add-photo]') || e.target.closest('#m3-stage')) {
+        fileInput.click();
+        return;
+      }
+    });
+
+    document.addEventListener('input', (e) => {
+      const key = e.target.dataset?.sync;
+      if (!key) return;
+      state[key] = e.target.value;
+      render();
+    });
+
+    document.getElementById('toggle-sample-photos').addEventListener('click', () => {
+      state.photos = state.photos.length > 0 ? [] : [...SAMPLE_PHOTOS];
+      state.activeThumb = 0;
+      render();
+    });
+
+    document.getElementById('toggle-id-shield').addEventListener('click', () => {
+      state.category = state.category === 'IDs, Cards & Wallets' ? 'Electronics' : 'IDs, Cards & Wallets';
+      render();
+    });
+
+    fileInput.addEventListener('change', () => {
+      const files = Array.from(fileInput.files || []).slice(0, 3 - state.photos.length);
+      files.forEach((f) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (state.photos.length < 3) {
+            state.photos.push(String(reader.result));
+            render();
+          }
+        };
+        reader.readAsDataURL(f);
+      });
+      fileInput.value = '';
+    });
+
+    render();
+  </script>
+</body>
+</html>

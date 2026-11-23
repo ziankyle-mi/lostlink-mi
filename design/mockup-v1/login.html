@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en" data-type="software" data-radius="soft" data-buttons="solid">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sign in · LostLink DLSAU</title>
+  <meta name="description"
+    content="Sign in with your @dlsau.edu.ph account to view campus holdings, file reports, or verify a claim at Life Science Building Room 102.">
+  <link rel="icon" href="assets/img/lostlink-badge.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#f6f7f2">
+  <meta name="site-kind" content="software">
+  <meta name="page-type" content="software">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..700&family=DM+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/system.css">
+  <style>
+    :root {
+      --p-bg: #f6f7f2;
+      --p-surface: #ffffff;
+      --p-ink: #0a0a0a;
+      --p-muted: #454545;
+      --p-accent: #1f6b3a;
+      --p-accent-ink: #ffffff;
+      --p-action: #1f6b3a;
+      --p-action-ink: #ffffff;
+      --font-display: "Outfit", system-ui, sans-serif;
+      --font-text: "Outfit", system-ui, sans-serif;
+      --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      --display-weight: 500;
+      --display-tracking: -0.025em;
+    }
+
+    body {
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      caret-color: var(--action);
+      accent-color: var(--action);
+    }
+
+    .vault-head {
+      position: relative;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg);
+    }
+
+    .vault-head__bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-4);
+      min-height: 76px;
+      padding-block: 10px;
+    }
+
+    .vault-head .nav__logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      font-weight: 600;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .vault-head .nav__logo img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      flex: none;
+    }
+
+    .vault-head__inst {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .vault-head__inst .nav__dlsau {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 48px;
+      min-height: 48px;
+      border-radius: var(--r-sm);
+    }
+
+    .vault-head__inst img {
+      width: 48px;
+      height: 48px;
+      flex: none;
+    }
+
+    .vault-main {
+      flex: 1 0 auto;
+      display: grid;
+      place-items: center;
+      padding-block: clamp(24px, 4vw, 44px);
+    }
+
+    .vault-stack {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--s-6);
+    }
+
+    /* Vault sheet uses a single 1px border declaration rather than shadow + border */
+    .vault-sheet {
+      width: min(100%, 448px);
+      background: var(--p-surface);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-md);
+      padding: 32px;
+    }
+
+    .vault-sheet__head {
+      padding-bottom: var(--s-5);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .vault-sheet__title {
+      font-size: clamp(24px, 1.2vw + 20px, 28px);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+    }
+
+    .vault-sheet__lead {
+      margin-top: var(--s-2);
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .vault-form {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-4);
+      margin-top: var(--s-5);
+    }
+
+    .vault-form .field :is(input) {
+      height: 46px;
+      background: var(--p-surface);
+      transition: border-color var(--dur) var(--ease);
+    }
+
+    .vault-form .field input::placeholder {
+      color: #686868;
+      opacity: 1;
+    }
+
+    .vault-form .field input:focus-visible {
+      outline: 2px solid var(--action);
+      outline-offset: 0;
+      border-color: var(--action);
+    }
+
+    .vault-pass {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .vault-pass input {
+      padding-right: 48px;
+    }
+
+    .vault-pass__toggle {
+      position: absolute;
+      right: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .vault-pass__toggle:hover {
+      color: var(--ink);
+    }
+
+    .vault-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+
+    .vault-check {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      min-height: 44px;
+      font-size: var(--t-small);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .vault-check input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: var(--action);
+      cursor: pointer;
+    }
+
+    .vault-link-btn {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      font-size: var(--t-small);
+      font-weight: 500;
+      color: var(--action);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+
+    .vault-link-btn:hover {
+      color: color-mix(in oklab, var(--action) 78%, var(--ink));
+    }
+
+    .vault-submit {
+      width: 100%;
+      height: 46px;
+      justify-content: center;
+      font-weight: 500;
+    }
+
+    .vault-note {
+      padding: var(--s-3);
+      border-radius: var(--r-sm);
+      background: var(--p-bg);
+      border: 1px solid var(--line);
+      font-size: var(--t-small);
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .vault-sheet__foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+      margin-top: var(--s-5);
+      padding-top: var(--s-4);
+      border-top: 1px solid var(--line);
+      font-size: var(--t-small);
+      color: var(--muted);
+    }
+
+    .vault-trust {
+      width: min(100%, 760px);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--s-5);
+      padding-top: var(--s-5);
+      border-top: 1px solid var(--line);
+    }
+
+    .vault-trust__k {
+      font-family: var(--font-mono);
+      font-size: var(--t-label);
+      font-weight: 500;
+      letter-spacing: 0;
+      color: var(--action);
+    }
+
+    .vault-trust p {
+      margin-top: var(--s-1);
+      font-size: var(--t-small);
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .vault-foot {
+      border-top: 1px solid var(--line);
+      background: var(--bg);
+    }
+
+    .vault-foot__bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--s-4);
+      padding-block: var(--s-5);
+      font-size: var(--t-small);
+      color: var(--muted);
+    }
+
+    .vault-foot__links {
+      display: flex;
+      align-items: center;
+      gap: var(--s-5);
+    }
+
+    .vault-foot__links a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      text-underline-offset: 3px;
+    }
+
+    .vault-foot__links a:hover {
+      color: var(--ink);
+      text-decoration: underline;
+    }
+
+    @media (max-width: 639px) {
+      .vault-head__inst span {
+        display: none;
+      }
+
+      .vault-trust {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--s-4);
+      }
+
+      .vault-sheet__foot {
+        gap: var(--s-1);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="vault-head">
+    <div class="wrap vault-head__bar">
+      <a class="skip-link" href="#login-main">Skip to sign in</a>
+      <a class="nav__logo" href="index.html">
+        <img src="assets/img/lostlink-badge.svg" alt="" width="28" height="28">
+        <span>LostLink</span>
+      </a>
+      <div class="vault-head__inst">
+        <span>De La Salle Araneta University</span>
+        <a class="nav__dlsau" href="https://www.dlsau.edu.ph/" target="_blank" rel="noopener noreferrer"
+          aria-label="De La Salle Araneta University">
+          <img src="assets/img/dlsau-logo.svg" alt="De La Salle Araneta University seal" width="28" height="28">
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="login-main" class="wrap vault-main">
+    <div class="vault-stack">
+      <section class="vault-sheet" aria-labelledby="login-h">
+        <div class="vault-sheet__head">
+          <h1 class="vault-sheet__title" id="login-h">Campus portal sign in</h1>
+          <p class="vault-sheet__lead">Use your @dlsau.edu.ph account to view campus holdings, file reports, or verify a
+            claim.</p>
+        </div>
+
+        <form class="form vault-form" id="login-form" action="index.html" method="get" data-fix="Fix {n} fields below.">
+          <div class="field field--full">
+            <label for="login-email">DLSAU Email</label>
+            <input id="login-email" name="email" type="email" autocomplete="email" inputmode="email"
+              placeholder="student.name@dlsau.edu.ph" pattern="[^@\s]+@dlsau\.edu\.ph$"
+              data-error="Enter a valid @dlsau.edu.ph email address." required>
+          </div>
+
+          <div class="field field--full">
+            <label for="login-password">Password</label>
+            <div class="vault-pass">
+              <input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6"
+                placeholder="Enter your password" data-error="Enter your password (at least 6 characters)." required>
+              <button type="button" class="vault-pass__toggle" id="password-toggle" aria-label="Show password"
+                aria-pressed="false" aria-controls="login-password">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="vault-row field--full">
+            <label class="vault-check">
+              <input type="checkbox" name="remember">
+              <span>Remember this browser</span>
+            </label>
+            <button type="button" class="vault-link-btn" id="reset-toggle" aria-expanded="false"
+              aria-controls="reset-note">Reset password</button>
+          </div>
+
+          <p class="vault-note field--full" id="reset-note" hidden>
+            Password resets are handled through DLSAU IT Services or in person with your campus ID at Life Science
+            Building Room 102.
+          </p>
+
+          <div class="field--full">
+            <button class="btn btn--primary vault-submit" type="submit">Sign In</button>
+          </div>
+
+          <p class="form__status" role="status" data-form-status></p>
+        </form>
+
+        <div class="vault-sheet__foot">
+          <span>Don't have an account yet?</span>
+          <a class="vault-link-btn" href="register.html">Register @dlsau.edu.ph</a>
+        </div>
+      </section>
+
+      <section class="vault-trust" aria-label="Campus custody standards">
+        <div>
+          <h2 class="vault-trust__k">LSB Room 102</h2>
+          <p>Physical custody desk open Mon–Fri, 8:00 AM–5:00 PM.</p>
+        </div>
+        <div>
+          <h2 class="vault-trust__k">LL Reference Tags</h2>
+          <p>Track every submitted item across all 17 buildings.</p>
+        </div>
+        <div>
+          <h2 class="vault-trust__k">ID Privacy Shield</h2>
+          <p>Student ID photos stay hidden on the public campus feed.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="vault-foot">
+    <div class="wrap vault-foot__bar">
+      <span>LostLink · De La Salle Araneta University</span>
+      <nav class="vault-foot__links" aria-label="Legal">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Use</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script type="module" src="assets/system.js"></script>
+  <script>
+    (() => {
+      const pass = document.getElementById('login-password');
+      const eyeBtn = document.getElementById('password-toggle');
+      const eyeOpen = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/></svg>';
+      const eyeClosed = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.2 4.2"/><path d="M9.9 4.2A10.7 10.7 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-3.2 4.3"/><path d="M6.6 6.6C3.7 8.7 2 12 2 12s3.5 8 10 8c1.6 0 3-.4 4.2-1"/></svg>';
+      eyeBtn?.addEventListener('click', () => {
+        const show = pass.type === 'password';
+        pass.type = show ? 'text' : 'password';
+        eyeBtn.setAttribute('aria-pressed', String(show));
+        eyeBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        eyeBtn.innerHTML = show ? eyeClosed : eyeOpen;
+      });
+
+      const wireToggle = (btnId, panelId) => {
+        const btn = document.getElementById(btnId);
+        const panel = document.getElementById(panelId);
+        btn?.addEventListener('click', () => {
+          const open = panel.hidden;
+          panel.hidden = !open;
+          btn.setAttribute('aria-expanded', String(open));
+        });
+      };
+      wireToggle('reset-toggle', 'reset-note');
+      wireToggle('register-toggle', 'register-note');
+
+      const form = document.getElementById('login-form');
+      const status = form?.querySelector('[data-form-status]');
+      form?.addEventListener('submit', e => {
+        if (e.defaultPrevented) return;
+        // shortcut: static mockup has no auth backend; prevent query-string password leak and route to feed
+        e.preventDefault();
+        const email = document.getElementById('login-email').value.trim();
+        if (status) status.textContent = `Signed in as ${email}. Opening campus feed…`;
+        const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350;
+        setTimeout(() => { window.location.href = 'feed.html'; }, delay);
+      });
+    })();
+  </script>
+</body>
+
+</html>
