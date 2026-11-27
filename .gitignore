@@ -2,6 +2,11 @@ node_modules
 dist
 .env
 .env.local
-.impeccable/review
+.agents/
+.claude/
+.codex/
+.impeccable/
 .taste-skill
+agent/
+skills-lock.json
 *.log
