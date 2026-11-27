@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 let liveRegion: HTMLDivElement | null = null;
@@ -7,7 +7,7 @@ let liveTimer: number | null = null;
 /** Single polite live region for blur-time field validation announcements. */
 function announceError(message: string) {
   if (typeof document === 'undefined') return;
-  if (!liveRegion) {
+  if (!liveRegion || !liveRegion.isConnected) {
     liveRegion = document.createElement('div');
     liveRegion.setAttribute('aria-live', 'polite');
     liveRegion.className = 'visually-hidden';
@@ -17,6 +17,7 @@ function announceError(message: string) {
   liveRegion.textContent = '';
   // Wait briefly so screen readers finish announcing the newly focused control first.
   liveTimer = window.setTimeout(() => {
+    liveTimer = null;
     if (liveRegion) liveRegion.textContent = message;
   }, 450);
 }
@@ -66,44 +67,47 @@ type ValidatorMap<K extends string> = Record<K, (value: string) => string | null
  */
 export function useFieldValidation<K extends string>(validators: ValidatorMap<K>) {
   const [errors, setErrors] = useState<Partial<Record<K, string>>>({});
-  const [dirty, setDirty] = useState<Partial<Record<K, boolean>>>({});
+  const errorsRef = useRef<Partial<Record<K, string>>>({});
+  const dirtyRef = useRef<Partial<Record<K, boolean>>>({});
+  const validatorsRef = useRef(validators);
+  validatorsRef.current = validators;
 
-  const handleChange = useCallback(
-    (field: K, value: string) => {
-      setDirty((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
-      setErrors((prev) => {
-        if (!prev[field]) return prev;
-        const nextErr = validators[field](value);
-        if (nextErr === prev[field]) return prev;
-        if (!nextErr) clearAnnouncedError();
-        return { ...prev, [field]: nextErr ?? undefined };
-      });
-    },
-    [validators]
-  );
+  useEffect(() => clearAnnouncedError, []);
 
-  const handleBlur = useCallback(
-    (field: K, value: string) => {
-      if (!dirty[field] && !errors[field] && value.trim().length === 0) return;
-      const msg = validators[field](value);
-      setErrors((prev) => ({ ...prev, [field]: msg ?? undefined }));
-      if (msg) announceError(msg);
-      else clearAnnouncedError();
-    },
-    [dirty, errors, validators]
-  );
+  const handleChange = useCallback((field: K, value: string) => {
+    dirtyRef.current[field] = true;
+    const prevErr = errorsRef.current[field];
+    if (!prevErr) return;
+    const nextErr = validatorsRef.current[field](value);
+    if (nextErr === prevErr) return;
+    if (!nextErr) clearAnnouncedError();
+    const updated = { ...errorsRef.current, [field]: nextErr ?? undefined };
+    errorsRef.current = updated;
+    setErrors(updated);
+  }, []);
+
+  const handleBlur = useCallback((field: K, value: string) => {
+    if (!dirtyRef.current[field] && !errorsRef.current[field] && value.trim().length === 0) return;
+    const msg = validatorsRef.current[field](value);
+    const updated = { ...errorsRef.current, [field]: msg ?? undefined };
+    errorsRef.current = updated;
+    setErrors(updated);
+    if (msg) announceError(msg);
+    else clearAnnouncedError();
+  }, []);
 
   const validateAll = useCallback(
     (values: Record<K, string>, elementIds: Partial<Record<K, string>>) => {
       const nextErrors: Partial<Record<K, string>> = {};
       let firstBad: K | null = null;
-      (Object.keys(validators) as K[]).forEach((key) => {
-        const msg = validators[key](values[key] ?? '');
+      (Object.keys(validatorsRef.current) as K[]).forEach((key) => {
+        const msg = validatorsRef.current[key](values[key] ?? '');
         if (msg) {
           nextErrors[key] = msg;
           if (!firstBad) firstBad = key;
         }
       });
+      errorsRef.current = nextErrors;
       setErrors(nextErrors);
       if (firstBad) {
         const elId = elementIds[firstBad];
@@ -113,23 +117,29 @@ export function useFieldValidation<K extends string>(validators: ValidatorMap<K>
       clearAnnouncedError();
       return true;
     },
-    [validators]
+    []
   );
 
   const setFieldError = useCallback((field: K, message: string | null) => {
-    setErrors((prev) => ({ ...prev, [field]: message ?? undefined }));
+    const updated = { ...errorsRef.current, [field]: message ?? undefined };
+    errorsRef.current = updated;
+    setErrors(updated);
   }, []);
 
   const reset = useCallback(() => {
+    errorsRef.current = {};
+    dirtyRef.current = {};
     setErrors({});
-    setDirty({});
     clearAnnouncedError();
   }, []);
 
-  const ariaFor = (field: K, errorId: string) => ({
-    'aria-invalid': Boolean(errors[field]),
-    'aria-describedby': errors[field] ? errorId : undefined,
-  });
+  const ariaFor = useCallback(
+    (field: K, errorId: string) => ({
+      'aria-invalid': Boolean(errors[field]),
+      'aria-describedby': errors[field] ? errorId : undefined,
+    }),
+    [errors]
+  );
 
   return {
     errors,

@@ -175,21 +175,18 @@ export async function uploadItemPhotos(
   userId: string,
   images: string[]
 ): Promise<string[]> {
-  const uploaded: string[] = [];
-  for (const src of images.slice(0, 3)) {
-    if (!src.startsWith('data:')) {
-      uploaded.push(src);
-      continue;
-    }
-    const { blob, ext, mime } = dataUrlToBlob(src);
-    const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await client.storage
-      .from(ITEM_PHOTOS_BUCKET)
-      .upload(path, blob, { contentType: mime, upsert: false });
-    if (error) throw new Error(`Photo upload failed: ${error.message}`);
-    uploaded.push(path);
-  }
-  return uploaded;
+  return Promise.all(
+    images.slice(0, 3).map(async (src) => {
+      if (!src.startsWith('data:')) return src;
+      const { blob, ext, mime } = dataUrlToBlob(src);
+      const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await client.storage
+        .from(ITEM_PHOTOS_BUCKET)
+        .upload(path, blob, { contentType: mime, upsert: false });
+      if (error) throw new Error(`Photo upload failed: ${error.message}`);
+      return path;
+    })
+  );
 }
 
 /** Batch-sign private storage paths in a single request; never sign shielded photos for non-admins. */
@@ -250,9 +247,11 @@ export async function fetchPortalSnapshot(client: SupabaseClient, user: Profile)
 
   const rawItems = ((itemsRes.data ?? []) as ItemRow[]).map(mapItem);
   const items = await signItemImages(client, rawItems, isAdmin);
+  const rawProfiles = isAdmin ? ((profilesRes.data ?? []) as ProfileRow[]).map(mapProfile) : [user];
+  const profiles = rawProfiles.some((p) => p.id === user.id) ? rawProfiles : [user, ...rawProfiles];
 
   return {
-    profiles: isAdmin ? ((profilesRes.data ?? []) as ProfileRow[]).map(mapProfile) : [user],
+    profiles,
     items,
     claims: ((claimsRes.data ?? []) as ClaimRow[]).map(mapClaim),
     notifications: ((notifsRes.data ?? []) as NotificationRow[]).map(mapNotification),

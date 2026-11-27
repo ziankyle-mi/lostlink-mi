@@ -75,18 +75,6 @@
       opacity: 0;
     }
   }
-
-  @media (prefers-reduced-motion: reduce) {
-
-    dialog[open],
-    dialog[open]::backdrop,
-    [data-infotip],
-    [data-validation-bubble] {
-      transition: none;
-      animation: none;
-      transform: none;
-    }
-  }
 }
 
 /* Visually hidden utility (canonical clip-path recipe) for polite screen-reader announcer */
@@ -135,13 +123,13 @@ select[aria-invalid="true"]:focus-visible {
     overlay 150ms allow-discrete;
 }
 
-[data-infotip]:is(:popover-open, .\:popover-open) {
+[data-infotip]:popover-open {
   opacity: 1;
   transform: translateY(0);
 }
 
 @starting-style {
-  [data-infotip]:is(:popover-open, .\:popover-open) {
+  [data-infotip]:popover-open {
     opacity: 0;
     transform: translateY(4px);
   }
@@ -231,4 +219,16 @@ select[aria-invalid="true"]:focus-visible {
   border-top: 1px solid #f5b5b5;
   border-left: 1px solid #f5b5b5;
   transform: rotate(45deg);
+}
+
+/* Kept unlayered so reduced-motion overrides unlayered popover/bubble animations */
+@media (prefers-reduced-motion: reduce) {
+  dialog[open],
+  dialog[open]::backdrop,
+  [data-infotip],
+  [data-validation-bubble] {
+    transition: none;
+    animation: none;
+    transform: none;
+  }
 }

@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
 import { InspectDialog, ReportDialog } from '../components/ItemDialogs';
 import { PhotoSlider } from '../components/PhotoSlider';
 import { StatusPill } from '../components/StatusPill';
 import { CAMPUS_BUILDINGS, ITEM_CATEGORIES, useLostLink } from '../lib/store';
-import type { Item, ItemType } from '../types';
+import type { ItemType } from '../types';
 
 type FeedFilter = 'all' | 'found' | 'lost' | 'shield';
 
@@ -20,13 +20,18 @@ export function FeedPage() {
   const [building, setBuilding] = useState('all');
   const [category, setCategory] = useState('all');
 
-  const [inspectedItem, setInspectedItem] = useState<Item | null>(null);
+  const [inspectedItemId, setInspectedItemId] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportDefaultType, setReportDefaultType] = useState<ItemType>('found');
 
   const approvedItems = useMemo(
     () => items.filter((item) => item.status === 'approved'),
     [items]
+  );
+
+  const inspectedItem = useMemo(
+    () => (inspectedItemId ? items.find((i) => i.id === inspectedItemId) ?? null : null),
+    [items, inspectedItemId]
   );
 
   const visibleItems = useMemo(() => {
@@ -53,19 +58,24 @@ export function FeedPage() {
     [approvedItems]
   );
 
-  const activeBroadcast = broadcasts.find((b) => b.active);
+  const activeBroadcast = useMemo(
+    () => broadcasts.find((b) => b.active),
+    [broadcasts]
+  );
 
-  const openReport = (kind: ItemType) => {
+  const openReport = useCallback((kind: ItemType) => {
     setReportDefaultType(kind);
     setReportOpen(true);
-  };
+  }, []);
 
-  const resetFilters = () => {
+  const openFoundReport = useCallback(() => openReport('found'), [openReport]);
+
+  const resetFilters = useCallback(() => {
     setTypeFilter('all');
     setSearch('');
     setBuilding('all');
     setCategory('all');
-  };
+  }, []);
 
   return (
     <div className="flex min-h-[100svh] flex-col bg-[#f6f7f2]">
@@ -81,7 +91,7 @@ export function FeedPage() {
         </div>
       )}
 
-      <Header onOpenReport={() => openReport('found')} />
+      <Header onOpenReport={openFoundReport} />
 
       <main className="mx-auto w-full max-w-[1280px] flex-1 px-6 py-6 sm:px-12 lg:px-20 lg:py-8">
         <div className="grid gap-5">
@@ -143,7 +153,7 @@ export function FeedPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setInspectedItem(spotlightItem)}
+                    onClick={() => setInspectedItemId(spotlightItem.id)}
                     className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-[var(--color-line-strong)] bg-white px-4 text-sm font-medium hover:bg-[#f6f7f2] cursor-pointer"
                   >
                     Inspect &amp; submit claim
@@ -303,11 +313,12 @@ export function FeedPage() {
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => setInspectedItem(item)}
+                    onClick={() => setInspectedItemId(item.id)}
                     onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setInspectedItem(item);
+                        setInspectedItemId(item.id);
                       }
                     }}
                     className="group grid cursor-pointer gap-2.5 text-left"
@@ -347,7 +358,7 @@ export function FeedPage() {
         </div>
       </main>
 
-      <InspectDialog item={inspectedItem} onClose={() => setInspectedItem(null)} />
+      <InspectDialog item={inspectedItem} onClose={() => setInspectedItemId(null)} />
       <ReportDialog
         open={reportOpen}
         defaultType={reportDefaultType}

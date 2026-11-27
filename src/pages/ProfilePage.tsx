@@ -125,7 +125,17 @@ export function ProfilePage() {
     if (!currentUser) {
       return { entries: [], totalReports: 0, activeReports: 0, claimsSubmitted: 0 };
     }
-    const itemMap = new Map(items.map((i) => [i.id, i]));
+    const itemMap = new Map<string, Item>();
+    const reportEntries: ActivityEntry[] = [];
+    let activeCount = 0;
+
+    for (const item of items) {
+      itemMap.set(item.id, item);
+      if (item.reporterId === currentUser.id) {
+        if (item.status !== 'resolved' && item.status !== 'rejected') activeCount += 1;
+        reportEntries.push(itemToEntry(item));
+      }
+    }
 
     const claimEntries = claims
       .filter((c) => c.claimantId === currentUser.id && c.status !== 'withdrawn')
@@ -134,15 +144,9 @@ export function ProfilePage() {
     // Keep verified (ready for pickup) claims at the top of the inbox.
     claimEntries.sort((a, b) => Number(b.ready) - Number(a.ready));
 
-    const userReports = items.filter((i) => i.reporterId === currentUser.id);
-    const activeCount = userReports.reduce(
-      (n, i) => n + (i.status === 'resolved' || i.status === 'rejected' ? 0 : 1),
-      0
-    );
-
     return {
-      entries: [...claimEntries, ...userReports.map(itemToEntry)],
-      totalReports: userReports.length,
+      entries: [...claimEntries, ...reportEntries],
+      totalReports: reportEntries.length,
       activeReports: activeCount,
       claimsSubmitted: claimEntries.length,
     };
@@ -153,19 +157,28 @@ export function ProfilePage() {
     [entries, filter]
   );
 
-  const selected =
-    visibleEntries.find((e) => e.id === selectedId) ?? visibleEntries[0] ?? null;
+  const selected = useMemo(
+    () => visibleEntries.find((e) => e.id === selectedId) ?? visibleEntries[0] ?? null,
+    [visibleEntries, selectedId]
+  );
+  const selectedItem = selected?.item;
+  const selectedClaimId = selected?.claimId;
   const canDeleteSelectedReport =
     selected?.kind === 'report' &&
-    selected.item?.status === 'pending' &&
-    selected.item.reporterId === currentUser?.id;
+    selectedItem?.status === 'pending' &&
+    selectedItem.reporterId === currentUser?.id;
 
-  const initials = (currentUser?.fullName ?? 'DL')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? '')
-    .join('');
+  const initials = useMemo(
+    () =>
+      (currentUser?.fullName ?? 'DL')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() ?? '')
+        .join(''),
+    [currentUser?.fullName]
+  );
 
   const summaryStats = [
     { label: 'Items reported', value: totalReports, Icon: ClipboardList, accent: false },
@@ -269,7 +282,7 @@ export function ProfilePage() {
                       setFilter(key);
                       setConfirmDeleteId(null);
                     }}
-                    className={`min-h-[38px] rounded-[7px] text-[13px] font-medium transition-colors cursor-pointer ${
+                    className={`min-h-[44px] rounded-[7px] text-[13px] font-medium transition-colors cursor-pointer ${
                       filter === key
                         ? 'bg-white text-[#0a0a0a] shadow-[0_1px_2px_rgba(10,10,10,0.08)]'
                         : 'text-[#525252] hover:text-[#0a0a0a]'
@@ -402,7 +415,7 @@ export function ProfilePage() {
                           >
                             {label}
                           </span>
-                          {idx < 2 && (
+                          {idx < selected.steps.length - 1 && (
                             <span aria-hidden="true" className="h-px w-5 bg-[var(--color-line-strong)]" />
                           )}
                         </li>
@@ -424,21 +437,21 @@ export function ProfilePage() {
                     {selected.nextAction}
                   </p>
 
-                  {selected.canWithdraw && selected.claimId ? (
+                  {selected.canWithdraw && selectedClaimId ? (
                     <button
                       type="button"
-                      onClick={() => withdrawClaim(selected.claimId!)}
+                      onClick={() => withdrawClaim(selectedClaimId)}
                       className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-lg border border-[var(--color-line-strong)] bg-white px-4 text-sm font-medium text-[#0a0a0a] transition-colors hover:bg-[#ecefe7] cursor-pointer"
                     >
                       Withdraw claim
                     </button>
-                  ) : canDeleteSelectedReport && selected.item ? (
-                    confirmDeleteId === selected.item.id ? (
+                  ) : canDeleteSelectedReport && selectedItem ? (
+                    confirmDeleteId === selectedItem.id ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
                           onClick={() => {
-                            deleteItem(selected.item!.id);
+                            deleteItem(selectedItem.id);
                             setConfirmDeleteId(null);
                             setSelectedId(null);
                           }}
@@ -457,7 +470,7 @@ export function ProfilePage() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setConfirmDeleteId(selected.item!.id)}
+                        onClick={() => setConfirmDeleteId(selectedItem.id)}
                         className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-lg border border-[#ef9a9a] bg-white px-4 text-sm font-medium text-[#991b1b] transition-colors hover:bg-[#fef2f2] cursor-pointer"
                       >
                         Delete report

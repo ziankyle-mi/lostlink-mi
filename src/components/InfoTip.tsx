@@ -23,8 +23,12 @@ function supportsPopoverHint(): boolean {
   return hintSupportCached;
 }
 
+let anchorSupportCached: boolean | null = null;
 function supportsNativeAnchor(): boolean {
-  return typeof CSS !== 'undefined' && CSS.supports('position-area: block-start');
+  if (anchorSupportCached !== null) return anchorSupportCached;
+  anchorSupportCached =
+    typeof CSS !== 'undefined' && CSS.supports('position-area: block-start');
+  return anchorSupportCached;
 }
 
 function positionPopoverFixed(
@@ -59,29 +63,44 @@ function positionPopoverFixed(
   pop.style.bottom = 'auto';
 }
 
-function openPopover(pop: HTMLElement, trigger: HTMLElement, preferred: 'top' | 'bottom') {
-  const el = pop as HTMLElement & {
-    showPopover?: (opts?: { source?: HTMLElement }) => void;
-    matches: (s: string) => boolean;
-  };
-  if (typeof el.showPopover !== 'function') return;
-  try {
-    if (!el.matches(':popover-open')) {
-      el.showPopover({ source: trigger });
-    }
-  } catch {
-    try {
-      el.showPopover();
-    } catch {
-      return;
-    }
-  }
+function syncPopoverPosition(
+  trigger: HTMLElement,
+  pop: HTMLElement,
+  preferred: 'top' | 'bottom'
+) {
   if (supportsNativeAnchor()) {
     const tr = trigger.getBoundingClientRect();
     const pr = pop.getBoundingClientRect();
     pop.dataset.actualSide = pr.top + pr.height / 2 < tr.top + tr.height / 2 ? 'top' : 'bottom';
   } else {
     positionPopoverFixed(trigger, pop, preferred);
+  }
+}
+
+function showPopoverOnly(pop: HTMLElement, trigger: HTMLElement): boolean {
+  const el = pop as HTMLElement & {
+    showPopover?: (opts?: { source?: HTMLElement }) => void;
+    matches: (s: string) => boolean;
+  };
+  if (typeof el.showPopover !== 'function') return false;
+  try {
+    if (!el.matches(':popover-open')) {
+      el.showPopover({ source: trigger });
+    }
+    return true;
+  } catch {
+    try {
+      el.showPopover();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function openPopover(pop: HTMLElement, trigger: HTMLElement, preferred: 'top' | 'bottom') {
+  if (showPopoverOnly(pop, trigger)) {
+    syncPopoverPosition(trigger, pop, preferred);
   }
 }
 
@@ -196,15 +215,14 @@ export function Tooltip({ text, children, side = 'top', className = '' }: Toolti
         role="tooltip"
         data-infotip=""
         data-side={side}
+        data-actual-side={side}
         data-anchored={nativeAnchor ? 'native' : 'js'}
         style={nativeAnchor ? ({ positionAnchor: anchorName } as CSSProperties) : undefined}
         {...({ popover: popoverType } as Record<string, string>)}
         onMouseEnter={clearTimers}
         onMouseLeave={() => scheduleClose(100)}
       >
-        <div className="infotip-body" data-side={side}>
-          {text}
-        </div>
+        <div className="infotip-body">{text}</div>
       </div>
     </span>
   );
@@ -246,13 +264,7 @@ export function Toggletip({ label, text, side = 'top' }: ToggletipProps) {
       const isNowOpen = te.newState === 'open';
       setOpen(isNowOpen);
       if (isNowOpen && btnRef.current) {
-        if (nativeAnchor) {
-          const tr = btnRef.current.getBoundingClientRect();
-          const pr = pop.getBoundingClientRect();
-          pop.dataset.actualSide = pr.top + pr.height / 2 < tr.top + tr.height / 2 ? 'top' : 'bottom';
-        } else {
-          positionPopoverFixed(btnRef.current, pop, side);
-        }
+        syncPopoverPosition(btnRef.current, pop, side);
       }
     };
     pop.addEventListener('toggle', onToggle);
@@ -260,12 +272,13 @@ export function Toggletip({ label, text, side = 'top' }: ToggletipProps) {
       clearClose();
       pop.removeEventListener('toggle', onToggle);
     };
-  }, [clearClose, nativeAnchor, side]);
+  }, [clearClose, side]);
 
   const show = () => {
     clearClose();
     if (btnRef.current && popRef.current) {
-      openPopover(popRef.current, btnRef.current, side);
+      // onToggle handles positioning once to avoid duplicate layout reads
+      showPopoverOnly(popRef.current, btnRef.current);
     }
   };
 
@@ -308,15 +321,14 @@ export function Toggletip({ label, text, side = 'top' }: ToggletipProps) {
         role="tooltip"
         data-infotip=""
         data-side={side}
+        data-actual-side={side}
         data-anchored={nativeAnchor ? 'native' : 'js'}
         style={nativeAnchor ? ({ positionAnchor: anchorName } as CSSProperties) : undefined}
         {...({ popover: popoverType } as Record<string, string>)}
         onMouseEnter={clearClose}
         onMouseLeave={scheduleHide}
       >
-        <div className="infotip-body" data-side={side}>
-          {text}
-        </div>
+        <div className="infotip-body">{text}</div>
       </div>
     </span>
   );

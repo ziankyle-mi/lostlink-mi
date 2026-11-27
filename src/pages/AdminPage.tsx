@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
@@ -96,23 +96,44 @@ export function AdminPage() {
   const custodyCount = unclaimedFound.length;
 
   const pendingClaimsCount = useMemo(
-    () => claims.filter((c) => c.status === 'pending').length,
+    () => claims.reduce((n, c) => n + (c.status === 'pending' ? 1 : 0), 0),
     [claims]
   );
 
-  const activeClaim = claims.find((c) => c.id === selectedClaimId) ?? claims[0] ?? null;
+  const activeClaim = useMemo(
+    () => claims.find((c) => c.id === selectedClaimId) ?? claims[0] ?? null,
+    [claims, selectedClaimId]
+  );
+  const activeClaimId = activeClaim?.id ?? '';
   const activeItem = activeClaim ? itemMap.get(activeClaim.itemId) : undefined;
   const activeClaimant = activeClaim ? profileMap.get(activeClaim.claimantId) : undefined;
 
+  // Clear dossier draft inputs when the active claim changes (manual click or queue update).
+  useEffect(() => {
+    setActionNote('');
+    setDenialReason('');
+  }, [activeClaimId]);
+
+  const selectTab = (next: AdminTab) => {
+    setTab(next);
+    setRejectTargetId(null);
+    setRejectReason('');
+    setRejectError(null);
+    setDeleteTargetId(null);
+    setTurnoverTargetId(null);
+    setBcError(null);
+  };
+
   const handleBroadcastSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (bcMessage.trim().length < 5) {
+    const clean = bcMessage.trim();
+    if (clean.length < 5) {
       setBcError('Enter a campus announcement (at least 5 characters).');
       document.getElementById('bc-msg')?.focus();
       return;
     }
     setBcError(null);
-    publishBroadcast(bcTier, bcMessage);
+    publishBroadcast(bcTier, clean);
     setBcMessage('');
   };
 
@@ -155,7 +176,7 @@ export function AdminPage() {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setTab(id)}
+                  onClick={() => selectTab(id)}
                   aria-pressed={active}
                   className={`grid gap-1 px-5 py-4 text-left transition-colors cursor-pointer ${
                     active ? 'bg-[#134e3a] text-white' : 'bg-white text-[#0a0a0a] hover:bg-[#f6f7f2]'
@@ -199,7 +220,7 @@ export function AdminPage() {
                 type="button"
                 role="tab"
                 aria-selected={tab === id}
-                onClick={() => setTab(id)}
+                onClick={() => selectTab(id)}
                 className={`min-h-[44px] rounded-lg border px-4 text-sm font-medium cursor-pointer ${tab === id
                     ? 'border-[#1f6b3a] bg-[#1f6b3a] text-white'
                     : 'border-[var(--color-line-strong)] bg-white text-[#0a0a0a]'
@@ -219,52 +240,55 @@ export function AdminPage() {
                     <span className="font-mono text-xs text-[#454545]">Select a claim to verify</span>
                   </div>
                   <div className="divide-y divide-[var(--color-line)]">
-                    {claims.map((claim) => {
-                      const item = itemMap.get(claim.itemId);
-                      const claimant = profileMap.get(claim.claimantId);
-                      const selected = activeClaim?.id === claim.id;
-                      return (
-                        <button
-                          key={claim.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedClaimId(claim.id);
-                            setActionNote('');
-                            setDenialReason('');
-                          }}
-                          aria-current={selected ? 'true' : 'false'}
-                          className={`grid w-full grid-cols-[1fr_auto] items-center gap-3 px-5 py-3.5 text-left sm:grid-cols-[1.3fr_1fr_auto] cursor-pointer ${selected ? 'bg-[#eaf1e9]' : 'bg-white hover:bg-[#f6f7f2]'
-                            }`}
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate text-[15px] font-semibold">
-                              {item?.name ?? 'Campus item'}
+                    {claims.length === 0 ? (
+                      <p className="p-5 text-sm text-[#454545]">
+                        No ownership claims have been submitted yet.
+                      </p>
+                    ) : (
+                      claims.map((claim) => {
+                        const item = itemMap.get(claim.itemId);
+                        const claimant = profileMap.get(claim.claimantId);
+                        const selected = activeClaim?.id === claim.id;
+                        return (
+                          <button
+                            key={claim.id}
+                            type="button"
+                            onClick={() => setSelectedClaimId(claim.id)}
+                            aria-current={selected ? 'true' : 'false'}
+                            className={`grid w-full grid-cols-[1fr_auto] items-center gap-3 px-5 py-3.5 text-left sm:grid-cols-[1.3fr_1fr_auto] cursor-pointer ${selected ? 'bg-[#eaf1e9]' : 'bg-white hover:bg-[#f6f7f2]'
+                              }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-[15px] font-semibold">
+                                {item?.name ?? 'Campus item'}
+                              </div>
+                              <div className="truncate text-sm text-[#454545]">
+                                {item?.location ?? 'Campus'} ·{' '}
+                                <span className="font-mono text-xs">{item?.referenceCode ?? '—'}</span>
+                              </div>
                             </div>
-                            <div className="truncate text-sm text-[#454545]">
-                              {item?.location} · <span className="font-mono text-xs">{item?.referenceCode}</span>
+                            <div className="hidden min-w-0 sm:block">
+                              <div className="truncate text-[15px] font-semibold">
+                                {claimant?.fullName ?? 'DLSAU Student'}
+                              </div>
+                              <div className="truncate font-mono text-xs text-[#454545]">
+                                {claimant?.studentId ?? claimant?.email ?? '—'}
+                              </div>
                             </div>
-                          </div>
-                          <div className="hidden min-w-0 sm:block">
-                            <div className="truncate text-[15px] font-semibold">
-                              {claimant?.fullName ?? 'DLSAU Student'}
-                            </div>
-                            <div className="truncate font-mono text-xs text-[#454545]">
-                              {claimant?.studentId ?? claimant?.email}
-                            </div>
-                          </div>
-                          <StatusPill
-                            tone={
-                              claim.status === 'verified'
-                                ? 'green'
-                                : claim.status === 'denied' || claim.status === 'withdrawn'
-                                  ? 'red'
-                                  : 'amber'
-                            }
-                            label={claim.status}
-                          />
-                        </button>
-                      );
-                    })}
+                            <StatusPill
+                              tone={
+                                claim.status === 'verified'
+                                  ? 'green'
+                                  : claim.status === 'denied' || claim.status === 'withdrawn'
+                                    ? 'red'
+                                    : 'amber'
+                              }
+                              label={claim.status}
+                            />
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </section>
               )}
@@ -358,12 +382,13 @@ export function AdminPage() {
                                 noValidate
                                 onSubmit={(e) => {
                                   e.preventDefault();
-                                  if (rejectReason.trim().length < 5) {
+                                  const cleanReason = rejectReason.trim();
+                                  if (cleanReason.length < 5) {
                                     setRejectError('Enter a brief rejection reason (at least 5 characters) for the reporter.');
                                     document.getElementById(`reject-reason-${item.id}`)?.focus();
                                     return;
                                   }
-                                  rejectIntake(item.id, rejectReason);
+                                  rejectIntake(item.id, cleanReason);
                                   setRejectTargetId(null);
                                   setRejectReason('');
                                   setRejectError(null);
@@ -549,23 +574,29 @@ export function AdminPage() {
                     <span className="font-mono text-xs text-[#454545]">Visible in student header ticker</span>
                   </div>
                   <div className="divide-y divide-[var(--color-line)]">
-                    {broadcasts.map((b) => (
-                      <div key={b.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                        <div className="grid gap-1">
-                          <span className="w-fit rounded-full border border-[#bae6fd] bg-[#e0f2fe] px-2.5 py-0.5 text-xs font-medium text-[#075985]">
-                            {b.tier}
-                          </span>
-                          <p className="text-sm">{b.message}</p>
+                    {broadcasts.length === 0 ? (
+                      <p className="p-5 text-sm text-[#454545]">
+                        No active campus notices. Publish one below to show in the student banner.
+                      </p>
+                    ) : (
+                      broadcasts.map((b) => (
+                        <div key={b.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                          <div className="grid gap-1">
+                            <span className="w-fit rounded-full border border-[#bae6fd] bg-[#e0f2fe] px-2.5 py-0.5 text-xs font-medium text-[#075985]">
+                              {b.tier}
+                            </span>
+                            <p className="text-sm">{b.message}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeBroadcast(b.id)}
+                            className="min-h-[44px] rounded-lg border border-[var(--color-line-strong)] px-3 text-sm font-medium hover:bg-[#f6f7f2] cursor-pointer"
+                          >
+                            Remove
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeBroadcast(b.id)}
-                          className="min-h-[44px] rounded-lg border border-[var(--color-line-strong)] px-3 text-sm font-medium hover:bg-[#f6f7f2] cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                   <form onSubmit={handleBroadcastSubmit} noValidate className="grid gap-3 border-t border-[var(--color-line)] p-5">
                     <div className="grid gap-1.5">
@@ -684,7 +715,7 @@ export function AdminPage() {
                   <dl className="divide-y divide-[var(--color-line)] border-y border-[var(--color-line)] text-sm">
                     <div className="flex justify-between py-2">
                       <dt className="text-[#454545]">Claimant</dt>
-                      <dd className="font-medium">{activeClaimant?.fullName}</dd>
+                      <dd className="font-medium">{activeClaimant?.fullName ?? 'DLSAU Member'}</dd>
                     </div>
                     <div className="flex justify-between py-2">
                       <dt className="text-[#454545]">Student ID</dt>
@@ -692,12 +723,12 @@ export function AdminPage() {
                     </div>
                     <div className="flex justify-between py-2">
                       <dt className="text-[#454545]">University email</dt>
-                      <dd className="font-medium">{activeClaimant?.email}</dd>
+                      <dd className="font-medium">{activeClaimant?.email ?? '—'}</dd>
                     </div>
                     <div className="flex justify-between py-2">
                       <dt className="text-[#454545]">College &amp; program</dt>
                       <dd className="font-medium">
-                        {activeClaimant?.program} · {activeClaimant?.college}
+                        {activeClaimant ? `${activeClaimant.program} · ${activeClaimant.college}` : '—'}
                       </dd>
                     </div>
                   </dl>
@@ -742,7 +773,7 @@ export function AdminPage() {
                       type="button"
                       disabled={activeClaim.status !== 'pending'}
                       onClick={() => {
-                        verifyClaim(activeClaim.id, 'denied', denialReason);
+                        verifyClaim(activeClaim.id, 'denied', denialReason.trim());
                         setDenialReason('');
                         setActionNote(`Denied claim on ${activeItem.referenceCode}.`);
                       }}

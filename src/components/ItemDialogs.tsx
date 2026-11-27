@@ -32,6 +32,12 @@ const FIELD_BASE =
 const CLOSE_BTN =
   'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[#454545] transition-colors hover:bg-black/[0.06] hover:text-[#0a0a0a] cursor-pointer';
 
+const choicePillClass = (active: boolean) =>
+  `min-h-[44px] rounded-lg border px-3 text-[13px] font-medium transition-colors cursor-pointer ${active
+    ? 'border-[#0a0a0a] bg-[#0a0a0a] text-white'
+    : 'border-[var(--color-line-strong)] bg-white text-[#0a0a0a] hover:bg-[#ecefe7]'
+  }`;
+
 function closeOnBackdrop(e: MouseEvent<HTMLDialogElement>, onClose: () => void) {
   if (e.target === e.currentTarget) onClose();
 }
@@ -70,10 +76,16 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
   );
   const validation = useFieldValidation(proofValidators);
 
+  const itemId = item?.id ?? null;
+
   useEffect(() => {
     const el = dialogRef.current;
     if (!el) return;
-    if (item) {
+    if (copyTimerRef.current !== null) {
+      window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+    if (itemId) {
       setProof('');
       setStatus(null);
       setCopied(false);
@@ -82,7 +94,7 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
     } else if (el.open) {
       el.close();
     }
-  }, [item, validation.reset]);
+  }, [itemId, validation.reset]);
 
   useEffect(() => {
     return () => {
@@ -108,25 +120,33 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
     if (!validation.validateAll({ proof }, { proof: 'claim-proof-input' })) return;
     const isFoundItem = item.type === 'found';
     setSubmitting(true);
-    const res = isFoundItem
-      ? await submitClaim(item.id, proof)
-      : await submitSighting(item.id, proof);
-    setSubmitting(false);
-    if (!res.ok) {
+    try {
+      const res = isFoundItem
+        ? await submitClaim(item.id, proof)
+        : await submitSighting(item.id, proof);
+      if (!res.ok) {
+        setStatus({
+          ok: false,
+          msg: res.error ?? (isFoundItem ? 'Could not submit claim.' : 'Could not send sighting.'),
+        });
+        return;
+      }
+      setStatus({
+        ok: true,
+        msg: isFoundItem
+          ? `Claim logged for ${item.referenceCode}. Bring your DLSAU ID to LSB Room 102 for verification.`
+          : `Sighting sent to the owner of ${item.referenceCode}. Thank you for helping out.`,
+      });
+      setProof('');
+      validation.reset();
+    } catch {
       setStatus({
         ok: false,
-        msg: res.error ?? (isFoundItem ? 'Could not submit claim.' : 'Could not send sighting.'),
+        msg: isFoundItem ? 'Could not submit claim.' : 'Could not send sighting.',
       });
-      return;
+    } finally {
+      setSubmitting(false);
     }
-    setStatus({
-      ok: true,
-      msg: isFoundItem
-        ? `Claim logged for ${item.referenceCode}. Bring your DLSAU ID to LSB Room 102 for verification.`
-        : `Sighting sent to the owner of ${item.referenceCode}. Thank you for helping out.`,
-    });
-    setProof('');
-    validation.reset();
   };
 
   const proofLen = proof.trim().length;
@@ -354,26 +374,30 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
   }, [open, defaultType, validation.reset]);
 
   const handleFiles = async (files: File[]) => {
+    if (files.length === 0) return;
     setError(null);
     validation.setFieldError('photos', null);
     setProcessingImages(true);
     try {
-      const next = [...images];
+      const remaining = Math.max(0, 3 - images.length);
+      const added: string[] = [];
       for (const file of files) {
-        if (next.length >= 3) break;
+        if (added.length >= remaining) break;
         const err = await validateImageFile(file);
         if (err) {
           validation.setFieldError('photos', err);
           continue;
         }
         try {
-          next.push(await sanitizeImageToDataUrl(file));
+          added.push(await sanitizeImageToDataUrl(file));
         } catch {
           validation.setFieldError('photos', 'Could not process selected image.');
         }
       }
-      setImages(next);
-      if (next.length > 0) validation.handleChange('photos', String(next.length));
+      if (added.length > 0) {
+        setImages((prev) => [...prev, ...added].slice(0, 3));
+        validation.handleChange('photos', String(Math.min(3, images.length + added.length)));
+      }
     } finally {
       setProcessingImages(false);
     }
@@ -398,29 +422,34 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
     );
     if (!ok) return;
     setSubmitting(true);
-    const submitImages =
-      images.length > 0 ? images : isLiveBackend ? [] : ['/assets/img/backpack.webp'];
-    const res = await createItem({
-      type,
-      name,
-      category,
-      location,
-      description,
-      images: submitImages,
-      hidePhoto: effectiveHidePhoto,
-    });
-    setSubmitting(false);
-    if (!res.ok) {
-      setError(res.error ?? 'Could not publish report.');
-      return;
+    try {
+      const submitImages =
+        images.length > 0 ? images : isLiveBackend ? [] : ['/assets/img/backpack.webp'];
+      const res = await createItem({
+        type,
+        name,
+        category,
+        location,
+        description,
+        images: submitImages,
+        hidePhoto: effectiveHidePhoto,
+      });
+      if (!res.ok) {
+        setError(res.error ?? 'Could not publish report.');
+        return;
+      }
+      setName('');
+      setDescription('');
+      setImages([]);
+      setHidePhoto(false);
+      validation.reset();
+      onCreated();
+      onClose();
+    } catch {
+      setError('Could not publish report.');
+    } finally {
+      setSubmitting(false);
     }
-    setName('');
-    setDescription('');
-    setImages([]);
-    setHidePhoto(false);
-    validation.reset();
-    onCreated();
-    onClose();
   };
 
   const descLen = description.trim().length;
@@ -540,10 +569,7 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
                     type="button"
                     aria-pressed={active}
                     onClick={() => setLocation(spot)}
-                    className={`min-h-[44px] rounded-lg border px-3 text-[13px] font-medium transition-colors cursor-pointer ${active
-                        ? 'border-[#0a0a0a] bg-[#0a0a0a] text-white'
-                        : 'border-[var(--color-line-strong)] bg-white text-[#0a0a0a] hover:bg-[#ecefe7]'
-                      }`}
+                    className={choicePillClass(active)}
                   >
                     {spot}
                   </button>
@@ -583,10 +609,7 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
                     type="button"
                     aria-pressed={active}
                     onClick={() => setCategory(c)}
-                    className={`min-h-[44px] rounded-lg border px-3 text-[13px] font-medium transition-colors cursor-pointer ${active
-                        ? 'border-[#0a0a0a] bg-[#0a0a0a] text-white'
-                        : 'border-[var(--color-line-strong)] bg-white text-[#0a0a0a] hover:bg-[#ecefe7]'
-                      }`}
+                    className={choicePillClass(active)}
                   >
                     {c}
                   </button>
@@ -602,7 +625,11 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
             e.preventDefault();
             setDragging(true);
           }}
-          onDragLeave={() => setDragging(false)}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              setDragging(false);
+            }
+          }}
           onDrop={handleDrop}
           className={`grid gap-3 border-b border-[var(--color-line)] px-5 py-5 transition-colors sm:px-7 ${dragging ? 'bg-[#e7f3ea]/60' : ''
             }`}
@@ -641,7 +668,7 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
               if (src) {
                 return (
                   <div
-                    key={`${src.slice(0, 32)}-${slot}`}
+                    key={`${slot}-${src.length}-${src.slice(-12)}`}
                     className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-[var(--color-line-strong)] bg-[#ecefe7]"
                   >
                     <img
@@ -657,7 +684,7 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
                     )}
                     <button
                       type="button"
-                      onClick={() => setImages(images.filter((_, idx) => idx !== slot))}
+                      onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== slot))}
                       aria-label={`Remove photo ${slot + 1}`}
                       className="absolute top-0 right-0 grid h-11 w-11 place-items-start justify-items-end p-1.5 cursor-pointer"
                     >
@@ -673,6 +700,7 @@ export function ReportDialog({ open, defaultType, onClose, onCreated }: ReportDi
                   key={slot}
                   id={slot === 0 ? 'rep-photo-slot-0' : undefined}
                   type="button"
+                  {...(slot === 0 ? validation.ariaFor('photos', 'rep-photos-err') : undefined)}
                   onClick={() => fileInputRef.current?.click()}
                   className={`flex aspect-[4/3] flex-col items-center justify-center gap-1 rounded-[10px] border-[1.5px] border-dashed bg-white text-center transition-colors hover:border-[#1f6b3a] hover:bg-[#eff4ec] cursor-pointer ${validation.errors.photos ? 'border-[#b91c1c] bg-[#fef2f2]' : 'border-[var(--color-line-strong)]'
                     }`}

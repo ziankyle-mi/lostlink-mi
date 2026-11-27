@@ -14,6 +14,7 @@ import type {
 } from '../types';
 import { supabase } from './supabase';
 import {
+  ITEM_PHOTOS_BUCKET,
   fetchPortalSnapshot,
   mapAdminLog,
   mapBroadcast,
@@ -38,17 +39,25 @@ import {
   PROGRAMS_BY_COLLEGE,
   type PersistedState,
 } from './seedData';
-import { isDlsauEmail, isStudentId } from './validation';
+import { generateTempPassword, isDlsauEmail, isStudentId } from './validation';
 
 export { CAMPUS_BUILDINGS, ITEM_CATEGORIES, PROGRAMS_BY_COLLEGE };
 
 const STORAGE_KEY = 'lostlink_dlsau_v1';
+const EMPTY_IMAGES: string[] = [];
+
+const PROGRAM_TO_COLLEGE = new Map<string, CollegeCode>(
+  Object.entries(PROGRAMS_BY_COLLEGE).flatMap(([college, programs]) =>
+    programs.map((program) => [program, college as CollegeCode] as const)
+  )
+);
 
 function inferCollege(program: string): CollegeCode {
-  for (const [college, list] of Object.entries(PROGRAMS_BY_COLLEGE)) {
-    if (list.includes(program)) return college as CollegeCode;
-  }
-  return 'CAST';
+  return PROGRAM_TO_COLLEGE.get(program) ?? 'CAST';
+}
+
+function makeId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 function makeLogEntry(
@@ -58,13 +67,42 @@ function makeLogEntry(
   detail: string
 ): AdminLogEntry {
   return {
-    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: makeId('log'),
     adminId,
     action,
     targetLabel,
     detail,
     createdAt: new Date().toISOString(),
   };
+}
+
+function makeNotification(userId: string, message: string): Notification {
+  return {
+    id: makeId('notif'),
+    userId,
+    message,
+    read: false,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function withDemoMeta(
+  prev: PersistedState,
+  adminId: string,
+  log: [action: string, target: string, detail: string],
+  notif?: [userId: string, message: string]
+): Partial<PersistedState> {
+  if (supabase) return {};
+  return {
+    ...(notif ? { notifications: [makeNotification(notif[0], notif[1]), ...prev.notifications] } : {}),
+    adminLog: [makeLogEntry(adminId, log[0], log[1], log[2]), ...prev.adminLog],
+  };
+}
+
+function runLiveTask(task: () => Promise<void>) {
+  void task().catch((err) => {
+    console.error('[LostLink] Live sync error:', err);
+  });
 }
 
 function loadInitial(): PersistedState {
@@ -74,8 +112,17 @@ function loadInitial(): PersistedState {
     if (!raw) return INITIAL_DEMO_STATE;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
-      ...INITIAL_DEMO_STATE,
-      ...parsed,
+      currentUserId: typeof parsed.currentUserId === 'string' ? parsed.currentUserId : null,
+      profiles:
+        Array.isArray(parsed.profiles) && parsed.profiles.length > 0
+          ? parsed.profiles
+          : INITIAL_DEMO_STATE.profiles,
+      items: Array.isArray(parsed.items) ? parsed.items : INITIAL_DEMO_STATE.items,
+      claims: Array.isArray(parsed.claims) ? parsed.claims : INITIAL_DEMO_STATE.claims,
+      notifications: Array.isArray(parsed.notifications)
+        ? parsed.notifications
+        : INITIAL_DEMO_STATE.notifications,
+      broadcasts: Array.isArray(parsed.broadcasts) ? parsed.broadcasts : INITIAL_DEMO_STATE.broadcasts,
       adminLog: Array.isArray(parsed.adminLog) ? parsed.adminLog : INITIAL_DEMO_STATE.adminLog,
     };
   } catch {
@@ -132,7 +179,8 @@ interface LostLinkContextValue extends PersistedState {
   updateUserRole: (userId: string, role: UserRole) => void;
   toggleUserActive: (userId: string) => void;
   issueTempPassword: (
-    userId: string
+    userId: string,
+    options?: { newPassword?: string; requireReset?: boolean }
   ) => Promise<{ ok: boolean; tempPassword?: string; error?: string }>;
 }
 
@@ -143,30 +191,46 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState<boolean>(() => !supabase);
   const hydratedUserRef = useRef<string | null>(null);
 
+  const currentUser = useMemo(
+    () => state.profiles.find((p) => p.id === state.currentUserId) ?? null,
+    [state.profiles, state.currentUserId]
+  );
+
+  // Keep refs in sync so action callbacks stay referentially stable and never read stale state
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
   const hydrateUser = useCallback(async (userId: string, force = false): Promise<Profile | null> => {
     if (!supabase) return null;
     if (!force && hydratedUserRef.current === userId) return null;
     hydratedUserRef.current = userId;
-    const { data: profileRow, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (error || !profileRow) {
+    try {
+      const { data: profileRow, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (error || !profileRow) {
+        hydratedUserRef.current = null;
+        setState(EMPTY_STATE);
+        return null;
+      }
+      const profile = mapProfile(profileRow as ProfileRow);
+      if (!profile.active) {
+        hydratedUserRef.current = null;
+        await supabase.auth.signOut();
+        setState(EMPTY_STATE);
+        return null;
+      }
+      const snapshot = await fetchPortalSnapshot(supabase, profile);
+      setState({ currentUserId: profile.id, ...snapshot });
+      return profile;
+    } catch {
       hydratedUserRef.current = null;
-      setState(EMPTY_STATE);
       return null;
     }
-    const profile = mapProfile(profileRow as ProfileRow);
-    if (!profile.active) {
-      hydratedUserRef.current = null;
-      await supabase.auth.signOut();
-      setState(EMPTY_STATE);
-      return null;
-    }
-    const snapshot = await fetchPortalSnapshot(supabase, profile);
-    setState({ currentUserId: profile.id, ...snapshot });
-    return profile;
   }, []);
 
   // Live Supabase auth session bootstrap + listener
@@ -174,18 +238,31 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
     let active = true;
 
-    void supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!active) return;
-      if (session?.user) {
-        await hydrateUser(session.user.id);
-      } else {
-        hydratedUserRef.current = null;
-        setState(EMPTY_STATE);
+    void (async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!active) return;
+        if (session?.user) {
+          await hydrateUser(session.user.id);
+        } else {
+          hydratedUserRef.current = null;
+          setState(EMPTY_STATE);
+        }
+      } catch {
+        if (active) {
+          hydratedUserRef.current = null;
+          setState(EMPTY_STATE);
+        }
+      } finally {
+        if (active) setAuthReady(true);
       }
-      if (active) setAuthReady(true);
-    });
+    })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session?.user) {
         hydratedUserRef.current = null;
         setState(EMPTY_STATE);
@@ -215,19 +292,20 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
     }
   }, [state]);
 
-  const currentUser = state.profiles.find((p) => p.id === state.currentUserId) ?? null;
-
   // Live Realtime notifications & broadcasts subscription
   useEffect(() => {
     if (!supabase || !currentUser?.id) return;
     const client = supabase;
     const uid = currentUser.id;
+    let active = true;
+
     const channel = client
       .channel(`portal-${uid}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` },
         (payload) => {
+          if (!active) return;
           const next = mapNotification(payload.new as NotificationRow);
           setState((prev) =>
             prev.notifications.some((n) => n.id === next.id)
@@ -240,8 +318,9 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
         const { data } = await client
           .from('broadcasts')
           .select('*')
-          .order('created_at', { ascending: false });
-        if (data) {
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (active && data) {
           setState((prev) => ({
             ...prev,
             broadcasts: (data as BroadcastRow[]).map(mapBroadcast),
@@ -251,17 +330,19 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
       .subscribe();
 
     return () => {
+      active = false;
       void client.removeChannel(channel);
     };
   }, [currentUser?.id]);
 
   const appendLiveAdminLog = useCallback(
     async (action: string, targetLabel: string, detail: string) => {
-      if (!supabase || !currentUser || currentUser.role !== 'admin') return;
+      const admin = currentUserRef.current;
+      if (!supabase || !admin || admin.role !== 'admin') return;
       const { data } = await supabase
         .from('admin_log')
         .insert({
-          admin_id: currentUser.id,
+          admin_id: admin.id,
           action,
           target_label: targetLabel,
           detail,
@@ -273,126 +354,134 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
         setState((prev) => ({ ...prev, adminLog: [entry, ...prev.adminLog] }));
       }
     },
-    [currentUser]
+    []
   );
 
-  const signIn = async (email: string, password: string) => {
-    const clean = email.trim().toLowerCase();
-    if (!isDlsauEmail(clean)) {
-      return { ok: false, error: 'Use a valid @dlsau.edu.ph email address.' };
-    }
-    if (password.length < 6) {
-      return { ok: false, error: 'Password must be at least 6 characters.' };
-    }
-
-    if (supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: clean, password });
-      if (error || !data.user) {
-        return { ok: false, error: 'Invalid DLSAU email or password.' };
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      const clean = email.trim().toLowerCase();
+      if (!isDlsauEmail(clean)) {
+        return { ok: false, error: 'Use a valid @dlsau.edu.ph email address.' };
       }
-      const profile = await hydrateUser(data.user.id, true);
-      if (!profile) {
-        return { ok: false, error: 'Account is suspended or missing a campus profile. Contact LSB Room 102.' };
+      if (password.length < 6) {
+        return { ok: false, error: 'Password must be at least 6 characters.' };
       }
-      return { ok: true, user: profile };
-    }
 
-    const existing = state.profiles.find((p) => p.email.toLowerCase() === clean);
-    if (existing && !existing.active) {
-      return { ok: false, error: 'This DLSAU account is suspended. Contact LSB Room 102.' };
-    }
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email: clean, password });
+        if (error || !data.user) {
+          return { ok: false, error: 'Invalid DLSAU email or password.' };
+        }
+        const profile = await hydrateUser(data.user.id, true);
+        if (!profile) {
+          return { ok: false, error: 'Account is suspended or missing a campus profile. Contact LSB Room 102.' };
+        }
+        return { ok: true, user: profile };
+      }
 
-    const user: Profile = existing ?? {
-      id: `user-${Date.now()}`,
-      fullName: clean.split('@')[0].replace(/[._]/g, ' '),
-      email: clean,
-      role: clean.includes('admin') || clean.includes('security') ? 'admin' : 'user',
-      accountType: 'student',
-      active: true,
-      college: 'CAST',
-      program: 'BSCS',
-      studentId: '2024-00-010001',
-      yearLevel: '3rd Year',
-      mustChangePassword: false,
-    };
+      const existing = stateRef.current.profiles.find((p) => p.email.toLowerCase() === clean);
+      if (existing && !existing.active) {
+        return { ok: false, error: 'This DLSAU account is suspended. Contact LSB Room 102.' };
+      }
 
-    setState((prev) => ({
-      ...prev,
-      currentUserId: user.id,
-      profiles: existing ? prev.profiles : [user, ...prev.profiles],
-    }));
-    return { ok: true, user };
-  };
+      const user: Profile = existing ?? {
+        id: makeId('user'),
+        fullName: clean.split('@')[0].replace(/[._]/g, ' '),
+        email: clean,
+        role: clean.includes('admin') || clean.includes('security') ? 'admin' : 'user',
+        accountType: 'student',
+        active: true,
+        college: 'CAST',
+        program: 'BSCS',
+        studentId: '2024-00-010001',
+        yearLevel: '3rd Year',
+        mustChangePassword: false,
+      };
 
-  const signInDemoRole = (role: 'student' | 'admin') => {
+      setState((prev) => ({
+        ...prev,
+        currentUserId: user.id,
+        profiles: existing ? prev.profiles : [user, ...prev.profiles],
+      }));
+      return { ok: true, user };
+    },
+    [hydrateUser]
+  );
+
+  const signInDemoRole = useCallback((role: 'student' | 'admin') => {
     const targetId = role === 'admin' ? 'user-admin' : 'user-renee';
-    const user = state.profiles.find((p) => p.id === targetId) ?? state.profiles[0];
+    const profiles = stateRef.current.profiles;
+    const user =
+      profiles.find((p) => p.id === targetId) ?? profiles[0] ?? INITIAL_DEMO_STATE.profiles[0];
     setState((prev) => ({ ...prev, currentUserId: user.id }));
     return user;
-  };
+  }, []);
 
-  const registerAccount = async (input: RegisterInput) => {
-    const email = input.email.trim().toLowerCase();
-    if (!isDlsauEmail(email)) {
-      return { ok: false, error: 'Only @dlsau.edu.ph accounts are allowed.' };
-    }
-    if (input.password.length < 8) {
-      return { ok: false, error: 'Password must be at least 8 characters.' };
-    }
-    if (input.accountType === 'student' && (!input.studentId || !isStudentId(input.studentId))) {
-      return { ok: false, error: 'Student ID must match YYYY-00-XXXXXX.' };
-    }
-
-    if (supabase) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: input.password,
-        options: {
-          data: {
-            full_name: input.fullName.trim(),
-            account_type: input.accountType,
-            college: inferCollege(input.program),
-            program: input.program,
-            student_id: input.accountType === 'student' ? input.studentId?.trim() : null,
-            year_level: input.accountType === 'student' ? input.yearLevel : null,
-          },
-        },
-      });
-      if (error) return { ok: false, error: error.message };
-      if (!data.session || !data.user) {
-        return { ok: true, needsEmailConfirm: true };
+  const registerAccount = useCallback(
+    async (input: RegisterInput) => {
+      const email = input.email.trim().toLowerCase();
+      if (!isDlsauEmail(email)) {
+        return { ok: false, error: 'Only @dlsau.edu.ph accounts are allowed.' };
       }
-      await hydrateUser(data.user.id);
+      if (input.password.length < 8) {
+        return { ok: false, error: 'Password must be at least 8 characters.' };
+      }
+      if (input.accountType === 'student' && (!input.studentId || !isStudentId(input.studentId))) {
+        return { ok: false, error: 'Student ID must match YYYY-00-XXXXXX.' };
+      }
+
+      if (supabase) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password: input.password,
+          options: {
+            data: {
+              full_name: input.fullName.trim(),
+              account_type: input.accountType,
+              college: inferCollege(input.program),
+              program: input.program,
+              student_id: input.accountType === 'student' ? input.studentId?.trim() : null,
+              year_level: input.accountType === 'student' ? input.yearLevel : null,
+            },
+          },
+        });
+        if (error) return { ok: false, error: error.message };
+        if (!data.session || !data.user) {
+          return { ok: true, needsEmailConfirm: true };
+        }
+        await hydrateUser(data.user.id);
+        return { ok: true };
+      }
+
+      if (stateRef.current.profiles.some((p) => p.email.toLowerCase() === email)) {
+        return { ok: false, error: 'An account with this @dlsau.edu.ph email already exists.' };
+      }
+
+      const user: Profile = {
+        id: makeId('user'),
+        fullName: input.fullName.trim(),
+        email,
+        role: 'user',
+        accountType: input.accountType,
+        active: true,
+        college: inferCollege(input.program),
+        program: input.program,
+        studentId: input.accountType === 'student' ? input.studentId : null,
+        yearLevel: input.accountType === 'student' ? input.yearLevel : null,
+        mustChangePassword: false,
+      };
+
+      setState((prev) => ({
+        ...prev,
+        currentUserId: user.id,
+        profiles: [user, ...prev.profiles],
+      }));
       return { ok: true };
-    }
+    },
+    [hydrateUser]
+  );
 
-    if (state.profiles.some((p) => p.email.toLowerCase() === email)) {
-      return { ok: false, error: 'An account with this @dlsau.edu.ph email already exists.' };
-    }
-
-    const user: Profile = {
-      id: `user-${Date.now()}`,
-      fullName: input.fullName.trim(),
-      email,
-      role: 'user',
-      accountType: input.accountType,
-      active: true,
-      college: inferCollege(input.program),
-      program: input.program,
-      studentId: input.accountType === 'student' ? input.studentId : null,
-      yearLevel: input.accountType === 'student' ? input.yearLevel : null,
-      mustChangePassword: false,
-    };
-
-    setState((prev) => ({
-      ...prev,
-      currentUserId: user.id,
-      profiles: [user, ...prev.profiles],
-    }));
-    return { ok: true };
-  };
-
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     if (supabase) {
       hydratedUserRef.current = null;
       setState(EMPTY_STATE);
@@ -404,49 +493,40 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
       return;
     }
     setState((prev) => ({ ...prev, currentUserId: null }));
-  };
+  }, []);
 
-  const completePasswordReset = async (newPassword: string) => {
-    if (!currentUser) return { ok: false, error: 'Please sign in first.' };
+  const completePasswordReset = useCallback(async (newPassword: string) => {
+    const user = currentUserRef.current;
+    if (!user) return { ok: false, error: 'Please sign in first.' };
     if (newPassword.length < 8) {
       return { ok: false, error: 'New password must be at least 8 characters.' };
     }
+    const notifMsg = 'Your DLSAU campus portal password has been updated.';
     if (supabase) {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) return { ok: false, error: error.message };
       const { error: profErr } = await supabase
         .from('profiles')
         .update({ must_change_password: false })
-        .eq('id', currentUser.id);
+        .eq('id', user.id);
       if (profErr) return { ok: false, error: profErr.message };
-      await supabase.from('notifications').insert({
-        user_id: currentUser.id,
-        message: 'Your DLSAU campus portal password has been updated.',
-      });
+      await supabase.from('notifications').insert({ user_id: user.id, message: notifMsg });
     }
     setState((prev) => ({
       ...prev,
       profiles: prev.profiles.map((p) =>
-        p.id === currentUser.id ? { ...p, mustChangePassword: false } : p
+        p.id === user.id ? { ...p, mustChangePassword: false } : p
       ),
       notifications: supabase
         ? prev.notifications
-        : [
-            {
-              id: `notif-${Date.now()}`,
-              userId: currentUser.id,
-              message: 'Your DLSAU campus portal password has been updated.',
-              read: false,
-              createdAt: new Date().toISOString(),
-            },
-            ...prev.notifications,
-          ],
+        : [makeNotification(user.id, notifMsg), ...prev.notifications],
     }));
     return { ok: true };
-  };
+  }, []);
 
-  const createItem = async (input: CreateItemInput) => {
-    if (!currentUser) return { ok: false, error: 'Please sign in first.' };
+  const createItem = useCallback(async (input: CreateItemInput) => {
+    const user = currentUserRef.current;
+    if (!user) return { ok: false, error: 'Please sign in first.' };
     if (input.description.trim().length < 10) {
       return { ok: false, error: 'Description must be at least 10 characters.' };
     }
@@ -468,7 +548,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
 
     if (supabase) {
       try {
-        const uploadedPaths = await uploadItemPhotos(supabase, currentUser.id, input.images);
+        const uploadedPaths = await uploadItemPhotos(supabase, user.id, input.images);
         const { data: itemRow, error } = await supabase
           .from('items')
           .insert({
@@ -483,21 +563,22 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             images: uploadedPaths,
             hide_photo: hidePhoto,
             custody_note: custodyNote,
-            reporter_id: currentUser.id,
+            reporter_id: user.id,
           })
           .select()
           .single();
         if (error || !itemRow) {
+          const orphanPaths = uploadedPaths.filter((p) => p.startsWith(`${user.id}/`));
+          if (orphanPaths.length > 0) {
+            void supabase.storage.from(ITEM_PHOTOS_BUCKET).remove(orphanPaths);
+          }
           return { ok: false, error: error?.message ?? 'Could not save report.' };
         }
-        await supabase.from('notifications').insert({
-          user_id: currentUser.id,
-          message: notifMsg,
-        });
+        await supabase.from('notifications').insert({ user_id: user.id, message: notifMsg });
         const [signedItem] = await signItemImages(
           supabase,
           [mapItem(itemRow as ItemRow)],
-          currentUser.role === 'admin'
+          user.role === 'admin'
         );
         setState((prev) => ({ ...prev, items: [signedItem, ...prev.items] }));
         return { ok: true, item: signedItem };
@@ -507,7 +588,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
     }
 
     const item: Item = {
-      id: `item-${Date.now()}`,
+      id: makeId('item'),
       referenceCode: refCode,
       type: input.type,
       status,
@@ -519,78 +600,68 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
       images: input.images.slice(0, 3),
       hidePhoto,
       custodyNote,
-      reporterId: currentUser.id,
-      createdAt: new Date().toISOString(),
-    };
-    const notif: Notification = {
-      id: `notif-${Date.now()}`,
-      userId: currentUser.id,
-      message: notifMsg,
-      read: false,
+      reporterId: user.id,
       createdAt: new Date().toISOString(),
     };
     setState((prev) => ({
       ...prev,
       items: [item, ...prev.items],
-      notifications: [notif, ...prev.notifications],
+      notifications: [makeNotification(user.id, notifMsg), ...prev.notifications],
     }));
     return { ok: true, item };
-  };
+  }, []);
 
-  const deleteItem = async (itemId: string) => {
-    if (!currentUser) return { ok: false, error: 'Please sign in first.' };
-    const target = state.items.find((i) => i.id === itemId);
-    if (!target) return { ok: false, error: 'Item not found.' };
-    const isAdminUser = currentUser.role === 'admin';
-    const isOwnerPending = target.reporterId === currentUser.id && target.status === 'pending';
-    if (!isAdminUser && !isOwnerPending) {
-      return { ok: false, error: 'You can only delete your own pending reports.' };
-    }
+  const deleteItem = useCallback(
+    async (itemId: string) => {
+      const user = currentUserRef.current;
+      if (!user) return { ok: false, error: 'Please sign in first.' };
+      const target = stateRef.current.items.find((i) => i.id === itemId);
+      if (!target) return { ok: false, error: 'Item not found.' };
+      const isAdminUser = user.role === 'admin';
+      const isOwnerPending = target.reporterId === user.id && target.status === 'pending';
+      if (!isAdminUser && !isOwnerPending) {
+        return { ok: false, error: 'You can only delete your own pending reports.' };
+      }
 
-    if (supabase) {
-      const { error } = await supabase.from('items').delete().eq('id', itemId);
-      if (error) return { ok: false, error: error.message };
+      if (supabase) {
+        const { error } = await supabase.from('items').delete().eq('id', itemId);
+        if (error) return { ok: false, error: error.message };
+      }
+
+      const detail = `Deleted ${target.name}`;
       setState((prev) => ({
         ...prev,
         items: prev.items.filter((i) => i.id !== itemId),
         claims: prev.claims.filter((c) => c.itemId !== itemId),
+        ...(isAdminUser ? withDemoMeta(prev, user.id, ['delete_item', target.referenceCode, detail]) : {}),
       }));
-      if (isAdminUser) {
-        await appendLiveAdminLog('delete_item', target.referenceCode, `Deleted ${target.name}`);
+
+      if (supabase && isAdminUser) {
+        await appendLiveAdminLog('delete_item', target.referenceCode, detail);
       }
       return { ok: true };
-    }
+    },
+    [appendLiveAdminLog]
+  );
 
-    setState((prev) => ({
-      ...prev,
-      items: prev.items.filter((i) => i.id !== itemId),
-      claims: prev.claims.filter((c) => c.itemId !== itemId),
-      adminLog: isAdminUser
-        ? [
-            makeLogEntry(currentUser.id, 'delete_item', target.referenceCode, `Deleted ${target.name}`),
-            ...prev.adminLog,
-          ]
-        : prev.adminLog,
-    }));
-    return { ok: true };
-  };
-
-  const submitClaim = async (itemId: string, proof: string) => {
-    if (!currentUser) return { ok: false, error: 'Please sign in first.' };
+  const submitClaim = useCallback(async (itemId: string, proof: string) => {
+    const user = currentUserRef.current;
+    if (!user) return { ok: false, error: 'Please sign in first.' };
     const cleanProof = proof.trim();
     if (cleanProof.length < 20) {
       return { ok: false, error: 'Write at least 20 characters of physical proof.' };
     }
-    const item = state.items.find((i) => i.id === itemId);
+    const { items, claims } = stateRef.current;
+    const item = items.find((i) => i.id === itemId);
     if (!item) return { ok: false, error: 'Item not found.' };
     if (item.type !== 'found' || item.status !== 'approved') {
       return { ok: false, error: 'Only approved found items can be claimed.' };
     }
-    if (item.reporterId === currentUser.id) {
+    if (item.reporterId === user.id) {
       return { ok: false, error: 'You cannot submit a claim on an item you reported.' };
     }
-    const duplicate = state.claims.some(
-      (c) => c.itemId === itemId && c.claimantId === currentUser.id && c.status === 'pending'
+    const duplicate = claims.some(
+      (c) => c.itemId === itemId && c.claimantId === user.id && c.status === 'pending'
     );
     if (duplicate) {
       return { ok: false, error: 'You already have a pending claim on this item.' };
@@ -601,7 +672,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
         .from('claims')
         .insert({
           item_id: itemId,
-          claimant_id: currentUser.id,
+          claimant_id: user.id,
           proof_description: cleanProof,
           status: 'pending',
         })
@@ -619,65 +690,65 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
     }
 
     const claim: Claim = {
-      id: `claim-${Date.now()}`,
+      id: makeId('claim'),
       itemId,
-      claimantId: currentUser.id,
+      claimantId: user.id,
       proofDescription: cleanProof,
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
     setState((prev) => ({ ...prev, claims: [claim, ...prev.claims] }));
     return { ok: true };
-  };
+  }, []);
 
-  const submitSighting = async (itemId: string, note: string) => {
-    if (!currentUser) return { ok: false, error: 'Please sign in first.' };
+  const submitSighting = useCallback(async (itemId: string, note: string) => {
+    const user = currentUserRef.current;
+    if (!user) return { ok: false, error: 'Please sign in first.' };
     const cleanNote = note.trim();
     if (cleanNote.length < 20) {
       return { ok: false, error: 'Write at least 20 characters describing the sighting.' };
     }
-    const item = state.items.find((i) => i.id === itemId);
+    const item = stateRef.current.items.find((i) => i.id === itemId);
     if (!item || item.type !== 'lost' || item.status !== 'approved') {
       return { ok: false, error: 'Sightings can only be sent on active lost-item alerts.' };
     }
-    if (item.reporterId === currentUser.id) {
+    if (item.reporterId === user.id) {
       return { ok: false, error: 'You cannot send a sighting on your own lost report.' };
     }
 
     if (supabase) {
       const { error } = await supabase.from('sightings').insert({
         item_id: itemId,
-        sender_id: currentUser.id,
+        sender_id: user.id,
         note: cleanNote,
       });
       if (error) return { ok: false, error: error.message };
       return { ok: true };
     }
 
-    const now = new Date().toISOString();
-    const ts = Date.now();
-    const ownerNotif: Notification = {
-      id: `notif-${ts}-r`,
-      userId: item.reporterId,
-      message: `Sighting on ${item.referenceCode} (${item.name}) from ${currentUser.fullName}: "${cleanNote}"`,
-      read: false,
-      createdAt: now,
-    };
-    const senderNotif: Notification = {
-      id: `notif-${ts}-s`,
-      userId: currentUser.id,
-      message: `Your sighting for ${item.referenceCode} (${item.name}) was sent to the owner.`,
-      read: false,
-      createdAt: now,
-    };
+    const ownerNotif = makeNotification(
+      item.reporterId,
+      `Sighting on ${item.referenceCode} (${item.name}) from ${user.fullName}: "${cleanNote}"`
+    );
+    const senderNotif = makeNotification(
+      user.id,
+      `Your sighting for ${item.referenceCode} (${item.name}) was sent to the owner.`
+    );
     setState((prev) => ({
       ...prev,
       notifications: [ownerNotif, senderNotif, ...prev.notifications],
     }));
     return { ok: true };
-  };
+  }, []);
 
-  const withdrawClaim = (claimId: string) => {
+  const withdrawClaim = useCallback((claimId: string) => {
+    const user = currentUserRef.current;
+    if (!user) return;
+    const match = stateRef.current.claims.some(
+      (c) => c.id === claimId && c.claimantId === user.id && c.status === 'pending'
+    );
+    if (!match) return;
+
     setState((prev) => ({
       ...prev,
       claims: prev.claims.map((c) =>
@@ -686,103 +757,119 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
           : c
       ),
     }));
-    if (supabase && currentUser) {
-      void supabase
-        .from('claims')
-        .update({ status: 'withdrawn' })
-        .eq('id', claimId)
-        .eq('claimant_id', currentUser.id)
-        .eq('status', 'pending');
+    if (supabase) {
+      const client = supabase;
+      runLiveTask(async () => {
+        await client
+          .from('claims')
+          .update({ status: 'withdrawn' })
+          .eq('id', claimId)
+          .eq('claimant_id', user.id)
+          .eq('status', 'pending');
+      });
     }
-  };
+  }, []);
 
-  const markNotificationRead = (id: string) => {
+  const markNotificationRead = useCallback((id: string) => {
+    const user = currentUserRef.current;
+    const target = stateRef.current.notifications.find((n) => n.id === id);
+    if (!target || target.read) return;
+
     setState((prev) => ({
       ...prev,
       notifications: prev.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
     }));
-    if (supabase && currentUser) {
-      void supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', id)
-        .eq('user_id', currentUser.id);
+    if (supabase && user) {
+      const client = supabase;
+      runLiveTask(async () => {
+        await client
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', id)
+          .eq('user_id', user.id);
+      });
     }
-  };
+  }, []);
 
-  const markAllNotificationsRead = () => {
+  const markAllNotificationsRead = useCallback(() => {
+    const user = currentUserRef.current;
+    if (!user) return;
+    const hasUnread = stateRef.current.notifications.some(
+      (n) => n.userId === user.id && !n.read
+    );
+    if (!hasUnread) return;
+
     setState((prev) => ({
       ...prev,
       notifications: prev.notifications.map((n) =>
         n.userId === prev.currentUserId ? { ...n, read: true } : n
       ),
     }));
-    if (supabase && currentUser) {
-      void supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('user_id', currentUser.id)
-        .eq('read', false);
-    }
-  };
-
-  const confirmIntake = (itemId: string) => {
-    if (currentUser?.role !== 'admin') return;
-    const target = state.items.find((i) => i.id === itemId);
-    if (!target) return;
-
-    const note = 'LSB Room 102 · Vault Custody';
-    const notifMsg = `Security confirmed physical custody for ${target.referenceCode} at LSB Room 102.`;
-    const detail = `Confirmed physical custody for ${target.name} at LSB Room 102.`;
-
     if (supabase) {
+      const client = supabase;
+      runLiveTask(async () => {
+        await client
+          .from('notifications')
+          .update({ read: true })
+          .eq('user_id', user.id)
+          .eq('read', false);
+      });
+    }
+  }, []);
+
+  const confirmIntake = useCallback(
+    (itemId: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin') return;
+      const target = stateRef.current.items.find((i) => i.id === itemId);
+      if (!target) return;
+
+      const note = 'LSB Room 102 · Vault Custody';
+      const notifMsg = `Security confirmed physical custody for ${target.referenceCode} at LSB Room 102.`;
+      const detail = `Confirmed physical custody for ${target.name} at LSB Room 102.`;
+
       setState((prev) => ({
         ...prev,
         items: prev.items.map((i) =>
           i.id === itemId ? { ...i, status: 'approved', custodyNote: note } : i
         ),
+        ...withDemoMeta(prev, admin.id, ['confirm_intake', target.referenceCode, detail], [
+          target.reporterId,
+          notifMsg,
+        ]),
       }));
-      void (async () => {
-        await supabase.from('items').update({ status: 'approved', custody_note: note }).eq('id', itemId);
-        await supabase.from('notifications').insert({ user_id: target.reporterId, message: notifMsg });
-        await appendLiveAdminLog('confirm_intake', target.referenceCode, detail);
-      })();
-      return;
-    }
 
-    setState((prev) => ({
-      ...prev,
-      items: prev.items.map((i) =>
-        i.id === itemId ? { ...i, status: 'approved', custodyNote: note } : i
-      ),
-      notifications: [
-        {
-          id: `notif-${Date.now()}`,
-          userId: target.reporterId,
-          message: notifMsg,
-          read: false,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev.notifications,
-      ],
-      adminLog: [
-        makeLogEntry(currentUser.id, 'confirm_intake', target.referenceCode, detail),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client
+            .from('items')
+            .update({ status: 'approved', custody_note: note })
+            .eq('id', itemId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await client.from('notifications').insert({ user_id: target.reporterId, message: notifMsg });
+          await appendLiveAdminLog('confirm_intake', target.referenceCode, detail);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-  const rejectIntake = (itemId: string, reason: string) => {
-    if (currentUser?.role !== 'admin') return;
-    const cleanReason = reason.trim();
-    if (!cleanReason) return;
-    const target = state.items.find((i) => i.id === itemId);
-    if (!target) return;
+  const rejectIntake = useCallback(
+    (itemId: string, reason: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin') return;
+      const cleanReason = reason.trim();
+      if (!cleanReason) return;
+      const target = stateRef.current.items.find((i) => i.id === itemId);
+      if (!target) return;
 
-    const custodyNote = `Rejected: ${cleanReason}`;
-    const notifMsg = `Report ${target.referenceCode} was rejected by Security Office: ${cleanReason}`;
+      const custodyNote = `Rejected: ${cleanReason}`;
+      const notifMsg = `Report ${target.referenceCode} was rejected by Security Office: ${cleanReason}`;
 
-    if (supabase) {
       setState((prev) => ({
         ...prev,
         items: prev.items.map((i) =>
@@ -790,95 +877,89 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             ? { ...i, status: 'rejected', rejectReason: cleanReason, custodyNote }
             : i
         ),
+        ...withDemoMeta(prev, admin.id, ['reject_intake', target.referenceCode, cleanReason], [
+          target.reporterId,
+          notifMsg,
+        ]),
       }));
-      void (async () => {
-        await supabase
-          .from('items')
-          .update({ status: 'rejected', reject_reason: cleanReason, custody_note: custodyNote })
-          .eq('id', itemId);
-        await supabase.from('notifications').insert({ user_id: target.reporterId, message: notifMsg });
-        await appendLiveAdminLog('reject_intake', target.referenceCode, cleanReason);
-      })();
-      return;
-    }
 
-    setState((prev) => ({
-      ...prev,
-      items: prev.items.map((i) =>
-        i.id === itemId
-          ? { ...i, status: 'rejected', rejectReason: cleanReason, custodyNote }
-          : i
-      ),
-      notifications: [
-        {
-          id: `notif-${Date.now()}`,
-          userId: target.reporterId,
-          message: notifMsg,
-          read: false,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev.notifications,
-      ],
-      adminLog: [
-        makeLogEntry(currentUser.id, 'reject_intake', target.referenceCode, cleanReason),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client
+            .from('items')
+            .update({ status: 'rejected', reject_reason: cleanReason, custody_note: custodyNote })
+            .eq('id', itemId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await client.from('notifications').insert({ user_id: target.reporterId, message: notifMsg });
+          await appendLiveAdminLog('reject_intake', target.referenceCode, cleanReason);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-  const toggleItemPhotoShield = (itemId: string) => {
-    if (currentUser?.role !== 'admin') return;
-    const target = state.items.find((i) => i.id === itemId);
-    if (!target) return;
-    const nextShield = !target.hidePhoto;
-    const detail = nextShield
-      ? 'Enabled ID Photo Shield (DO Admin only).'
-      : 'Disabled ID Photo Shield.';
+  const toggleItemPhotoShield = useCallback(
+    (itemId: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin') return;
+      const target = stateRef.current.items.find((i) => i.id === itemId);
+      if (!target) return;
+      const nextShield = !target.hidePhoto;
+      const detail = nextShield
+        ? 'Enabled ID Photo Shield (DO Admin only).'
+        : 'Disabled ID Photo Shield.';
 
-    if (supabase) {
       setState((prev) => ({
         ...prev,
         items: prev.items.map((i) => (i.id === itemId ? { ...i, hidePhoto: nextShield } : i)),
+        ...withDemoMeta(prev, admin.id, ['toggle_photo_shield', target.referenceCode, detail]),
       }));
-      void (async () => {
-        await supabase.from('items').update({ hide_photo: nextShield }).eq('id', itemId);
-        await appendLiveAdminLog('toggle_photo_shield', target.referenceCode, detail);
-      })();
-      return;
-    }
 
-    setState((prev) => ({
-      ...prev,
-      items: prev.items.map((i) => (i.id === itemId ? { ...i, hidePhoto: nextShield } : i)),
-      adminLog: [
-        makeLogEntry(currentUser.id, 'toggle_photo_shield', target.referenceCode, detail),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client
+            .from('items')
+            .update({ hide_photo: nextShield })
+            .eq('id', itemId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await appendLiveAdminLog('toggle_photo_shield', target.referenceCode, detail);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-  const verifyClaim = (claimId: string, decision: 'verified' | 'denied', reason?: string) => {
-    if (currentUser?.role !== 'admin') return;
-    const cleanReason = reason?.trim() || null;
-    const claim = state.claims.find((c) => c.id === claimId);
-    if (!claim) return;
-    const item = state.items.find((i) => i.id === claim.itemId);
-    const refCode = item?.referenceCode ?? 'item';
-    const notifMsg =
-      decision === 'verified'
-        ? `Claim verified for ${refCode}. Bring your DLSAU ID to LSB Room 102 for pickup.`
-        : cleanReason
-          ? `Claim denied for ${refCode}: ${cleanReason}`
-          : `Claim denied for ${refCode}. Contact LSB Room 102 if you have additional proof.`;
-    const logAction = decision === 'verified' ? 'verify_claim' : 'deny_claim';
-    const logDetail =
-      decision === 'verified'
-        ? `Verified claim and released ${item?.name ?? 'item'}.`
-        : cleanReason
-          ? `Denied claim: ${cleanReason}`
-          : 'Denied claim for insufficient ownership proof.';
+  const verifyClaim = useCallback(
+    (claimId: string, decision: 'verified' | 'denied', reason?: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin') return;
+      const cleanReason = reason?.trim() || null;
+      const claim = stateRef.current.claims.find((c) => c.id === claimId);
+      if (!claim) return;
+      const item = stateRef.current.items.find((i) => i.id === claim.itemId);
+      const refCode = item?.referenceCode ?? 'item';
+      const notifMsg =
+        decision === 'verified'
+          ? `Claim verified for ${refCode}. Bring your DLSAU ID to LSB Room 102 for pickup.`
+          : cleanReason
+            ? `Claim denied for ${refCode}: ${cleanReason}`
+            : `Claim denied for ${refCode}. Contact LSB Room 102 if you have additional proof.`;
+      const logAction = decision === 'verified' ? 'verify_claim' : 'deny_claim';
+      const logDetail =
+        decision === 'verified'
+          ? `Verified claim and released ${item?.name ?? 'item'}.`
+          : cleanReason
+            ? `Denied claim: ${cleanReason}`
+            : 'Denied claim for insufficient ownership proof.';
 
-    if (supabase) {
       setState((prev) => ({
         ...prev,
         claims: prev.claims.map((c) => {
@@ -896,117 +977,93 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
                 i.id === claim.itemId ? { ...i, status: 'resolved', custodyNote: 'Released to owner' } : i
               )
             : prev.items,
+        ...withDemoMeta(prev, admin.id, [logAction, refCode, logDetail], [claim.claimantId, notifMsg]),
       }));
-      void (async () => {
-        await supabase
-          .from('claims')
-          .update({ status: decision, denial_reason: decision === 'denied' ? cleanReason : null })
-          .eq('id', claimId);
-        if (decision === 'verified') {
-          await supabase
+
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client
             .from('claims')
-            .update({
-              status: 'denied',
-              denial_reason: 'Item verified and released to another claimant.',
-            })
-            .eq('item_id', claim.itemId)
-            .eq('status', 'pending')
-            .neq('id', claimId);
-          await supabase
-            .from('items')
-            .update({ status: 'resolved', custody_note: 'Released to owner' })
-            .eq('id', claim.itemId);
-        }
-        await supabase.from('notifications').insert({ user_id: claim.claimantId, message: notifMsg });
-        await appendLiveAdminLog(logAction, refCode, logDetail);
-      })();
-      return;
-    }
+            .update({ status: decision, denial_reason: decision === 'denied' ? cleanReason : null })
+            .eq('id', claimId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          if (decision === 'verified') {
+            await client
+              .from('claims')
+              .update({
+                status: 'denied',
+                denial_reason: 'Item verified and released to another claimant.',
+              })
+              .eq('item_id', claim.itemId)
+              .eq('status', 'pending')
+              .neq('id', claimId);
+            await client
+              .from('items')
+              .update({ status: 'resolved', custody_note: 'Released to owner' })
+              .eq('id', claim.itemId);
+          }
+          await client.from('notifications').insert({ user_id: claim.claimantId, message: notifMsg });
+          await appendLiveAdminLog(logAction, refCode, logDetail);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-    setState((prev) => ({
-      ...prev,
-      claims: prev.claims.map((c) => {
-        if (c.id === claimId) {
-          return { ...c, status: decision, denialReason: decision === 'denied' ? cleanReason : null };
-        }
-        if (decision === 'verified' && c.itemId === claim.itemId && c.status === 'pending') {
-          return { ...c, status: 'denied', denialReason: 'Item verified and released to another claimant.' };
-        }
-        return c;
-      }),
-      items:
-        decision === 'verified'
-          ? prev.items.map((i) =>
-              i.id === claim.itemId ? { ...i, status: 'resolved', custodyNote: 'Released to owner' } : i
-            )
-          : prev.items,
-      notifications: [
-        {
-          id: `notif-${Date.now()}`,
-          userId: claim.claimantId,
-          message: notifMsg,
-          read: false,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev.notifications,
-      ],
-      adminLog: [
-        makeLogEntry(currentUser.id, logAction, refCode, logDetail),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+  const extendCustody = useCallback(
+    (itemId: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin') return;
+      const target = stateRef.current.items.find((i) => i.id === itemId);
+      if (!target || target.type !== 'found' || target.status !== 'approved') return;
 
-  const extendCustody = (itemId: string) => {
-    if (currentUser?.role !== 'admin') return;
-    const target = state.items.find((i) => i.id === itemId);
-    if (!target || target.type !== 'found' || target.status !== 'approved') return;
+      const baseMs = Math.max(
+        Date.now(),
+        target.custodyExtendedUntil ? Date.parse(target.custodyExtendedUntil) || 0 : 0
+      );
+      const nextUntil = new Date(baseMs + 14 * 86_400_000).toISOString();
+      const untilDate = nextUntil.slice(0, 10);
+      const custodyNote = `LSB Room 102 · Hold extended until ${untilDate}`;
+      const detail = `Extended hold +14 days (until ${untilDate}).`;
 
-    const baseMs = Math.max(
-      Date.now(),
-      target.custodyExtendedUntil ? Date.parse(target.custodyExtendedUntil) || 0 : 0
-    );
-    const nextUntil = new Date(baseMs + 14 * 86_400_000).toISOString();
-    const untilDate = nextUntil.slice(0, 10);
-    const custodyNote = `LSB Room 102 · Hold extended until ${untilDate}`;
-    const detail = `Extended hold +14 days (until ${untilDate}).`;
-
-    if (supabase) {
       setState((prev) => ({
         ...prev,
         items: prev.items.map((i) =>
           i.id === itemId ? { ...i, custodyExtendedUntil: nextUntil, custodyNote } : i
         ),
+        ...withDemoMeta(prev, admin.id, ['extend_custody', target.referenceCode, detail]),
       }));
-      void (async () => {
-        await supabase
-          .from('items')
-          .update({ custody_extended_until: nextUntil, custody_note: custodyNote })
-          .eq('id', itemId);
-        await appendLiveAdminLog('extend_custody', target.referenceCode, detail);
-      })();
-      return;
-    }
 
-    setState((prev) => ({
-      ...prev,
-      items: prev.items.map((i) =>
-        i.id === itemId ? { ...i, custodyExtendedUntil: nextUntil, custodyNote } : i
-      ),
-      adminLog: [
-        makeLogEntry(currentUser.id, 'extend_custody', target.referenceCode, detail),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client
+            .from('items')
+            .update({ custody_extended_until: nextUntil, custody_note: custodyNote })
+            .eq('id', itemId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await appendLiveAdminLog('extend_custody', target.referenceCode, detail);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-  const markDonationTurnover = (itemId: string) => {
-    if (currentUser?.role !== 'admin') return;
-    const target = state.items.find((i) => i.id === itemId);
-    if (!target || target.type !== 'found' || target.status !== 'approved') return;
-    const detail = `Closed ${target.name} as campus donation turnover.`;
+  const markDonationTurnover = useCallback(
+    (itemId: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin') return;
+      const target = stateRef.current.items.find((i) => i.id === itemId);
+      if (!target || target.type !== 'found' || target.status !== 'approved') return;
+      const detail = `Closed ${target.name} as campus donation turnover.`;
 
-    if (supabase) {
       setState((prev) => ({
         ...prev,
         items: prev.items.map((i) =>
@@ -1019,251 +1076,297 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             ? { ...c, status: 'denied', denialReason: 'Item turned over for campus donation.' }
             : c
         ),
+        ...withDemoMeta(prev, admin.id, ['donation_turnover', target.referenceCode, detail]),
       }));
-      void (async () => {
-        await supabase
-          .from('items')
-          .update({
-            status: 'resolved',
-            donation_turnover: true,
-            custody_note: 'Turned over for campus donation',
-          })
-          .eq('id', itemId);
-        await supabase
-          .from('claims')
-          .update({ status: 'denied', denial_reason: 'Item turned over for campus donation.' })
-          .eq('item_id', itemId)
-          .eq('status', 'pending');
-        await appendLiveAdminLog('donation_turnover', target.referenceCode, detail);
-      })();
-      return;
-    }
 
-    setState((prev) => ({
-      ...prev,
-      items: prev.items.map((i) =>
-        i.id === itemId
-          ? { ...i, status: 'resolved', donationTurnover: true, custodyNote: 'Turned over for campus donation' }
-          : i
-      ),
-      claims: prev.claims.map((c) =>
-        c.itemId === itemId && c.status === 'pending'
-          ? { ...c, status: 'denied', denialReason: 'Item turned over for campus donation.' }
-          : c
-      ),
-      adminLog: [
-        makeLogEntry(currentUser.id, 'donation_turnover', target.referenceCode, detail),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client
+            .from('items')
+            .update({
+              status: 'resolved',
+              donation_turnover: true,
+              custody_note: 'Turned over for campus donation',
+            })
+            .eq('id', itemId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await client
+            .from('claims')
+            .update({ status: 'denied', denial_reason: 'Item turned over for campus donation.' })
+            .eq('item_id', itemId)
+            .eq('status', 'pending');
+          await appendLiveAdminLog('donation_turnover', target.referenceCode, detail);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-  const publishBroadcast = (tier: BroadcastTier, message: string) => {
-    if (currentUser?.role !== 'admin' || !message.trim()) return;
-    const clean = message.trim();
+  const publishBroadcast = useCallback(
+    (tier: BroadcastTier, message: string) => {
+      const admin = currentUserRef.current;
+      const clean = message.trim();
+      if (admin?.role !== 'admin' || !clean) return;
 
-    if (supabase) {
-      void (async () => {
-        const { data } = await supabase
-          .from('broadcasts')
-          .insert({ tier, message: clean, active: true, created_by: currentUser.id })
-          .select()
-          .single();
-        if (data) {
-          const next = mapBroadcast(data as BroadcastRow);
-          setState((prev) => ({
-            ...prev,
-            broadcasts: prev.broadcasts.some((b) => b.id === next.id)
-              ? prev.broadcasts
-              : [next, ...prev.broadcasts],
-          }));
-          await appendLiveAdminLog('publish_broadcast', tier, clean);
-        }
-      })();
-      return;
-    }
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { data } = await client
+            .from('broadcasts')
+            .insert({ tier, message: clean, active: true, created_by: admin.id })
+            .select()
+            .single();
+          if (data) {
+            const next = mapBroadcast(data as BroadcastRow);
+            setState((prev) => ({
+              ...prev,
+              broadcasts: prev.broadcasts.some((b) => b.id === next.id)
+                ? prev.broadcasts
+                : [next, ...prev.broadcasts],
+            }));
+            await appendLiveAdminLog('publish_broadcast', tier, clean);
+          }
+        });
+        return;
+      }
 
-    const next: Broadcast = {
-      id: `bc-${Date.now()}`,
-      tier,
-      message: clean,
-      active: true,
-      createdAt: new Date().toISOString(),
-    };
-    setState((prev) => ({
-      ...prev,
-      broadcasts: [next, ...prev.broadcasts],
-      adminLog: [
-        makeLogEntry(currentUser.id, 'publish_broadcast', tier, clean),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      const next: Broadcast = {
+        id: makeId('bc'),
+        tier,
+        message: clean,
+        active: true,
+        createdAt: new Date().toISOString(),
+      };
+      setState((prev) => ({
+        ...prev,
+        broadcasts: [next, ...prev.broadcasts],
+        ...withDemoMeta(prev, admin.id, ['publish_broadcast', tier, clean]),
+      }));
+    },
+    [appendLiveAdminLog]
+  );
 
-  const removeBroadcast = (id: string) => {
-    if (currentUser?.role !== 'admin') return;
-    const target = state.broadcasts.find((b) => b.id === id);
-    if (!target) return;
+  const removeBroadcast = useCallback(
+    (id: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin') return;
+      const target = stateRef.current.broadcasts.find((b) => b.id === id);
+      if (!target) return;
+      const detail = `Removed: ${target.message}`;
 
-    if (supabase) {
-      setState((prev) => ({ ...prev, broadcasts: prev.broadcasts.filter((b) => b.id !== id) }));
-      void (async () => {
-        await supabase.from('broadcasts').delete().eq('id', id);
-        await appendLiveAdminLog('remove_broadcast', target.tier, `Removed: ${target.message}`);
-      })();
-      return;
-    }
+      setState((prev) => ({
+        ...prev,
+        broadcasts: prev.broadcasts.filter((b) => b.id !== id),
+        ...withDemoMeta(prev, admin.id, ['remove_broadcast', target.tier, detail]),
+      }));
 
-    setState((prev) => ({
-      ...prev,
-      broadcasts: prev.broadcasts.filter((b) => b.id !== id),
-      adminLog: [
-        makeLogEntry(currentUser.id, 'remove_broadcast', target.tier, `Removed: ${target.message}`),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client.from('broadcasts').delete().eq('id', id);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await appendLiveAdminLog('remove_broadcast', target.tier, detail);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-  const updateUserRole = (userId: string, role: UserRole) => {
-    if (currentUser?.role !== 'admin' || userId === currentUser.id) return;
-    const target = state.profiles.find((p) => p.id === userId);
-    if (!target) return;
-    const detail = `Changed role for ${target.fullName} to ${role === 'admin' ? 'DO Admin' : 'Student / Faculty'}.`;
+  const updateUserRole = useCallback(
+    (userId: string, role: UserRole) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin' || userId === admin.id) return;
+      const target = stateRef.current.profiles.find((p) => p.id === userId);
+      if (!target) return;
+      const detail = `Changed role for ${target.fullName} to ${role === 'admin' ? 'DO Admin' : 'Student / Faculty'}.`;
 
-    if (supabase) {
       setState((prev) => ({
         ...prev,
         profiles: prev.profiles.map((p) => (p.id === userId ? { ...p, role } : p)),
+        ...withDemoMeta(prev, admin.id, ['update_user_role', target.email, detail]),
       }));
-      void (async () => {
-        await supabase.from('profiles').update({ role }).eq('id', userId);
-        await appendLiveAdminLog('update_user_role', target.email, detail);
-      })();
-      return;
-    }
 
-    setState((prev) => ({
-      ...prev,
-      profiles: prev.profiles.map((p) => (p.id === userId ? { ...p, role } : p)),
-      adminLog: [
-        makeLogEntry(currentUser.id, 'update_user_role', target.email, detail),
-        ...prev.adminLog,
-      ],
-    }));
-  };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client.from('profiles').update({ role }).eq('id', userId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await appendLiveAdminLog('update_user_role', target.email, detail);
+        });
+      }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-  const toggleUserActive = (userId: string) => {
-    if (currentUser?.role !== 'admin' || userId === currentUser.id) return;
-    const target = state.profiles.find((p) => p.id === userId);
-    if (!target) return;
-    const nextActive = !target.active;
-    const detail = nextActive ? `Reactivated ${target.fullName}.` : `Suspended ${target.fullName}.`;
+  const toggleUserActive = useCallback(
+    (userId: string) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin' || userId === admin.id) return;
+      const target = stateRef.current.profiles.find((p) => p.id === userId);
+      if (!target) return;
+      const nextActive = !target.active;
+      const detail = nextActive ? `Reactivated ${target.fullName}.` : `Suspended ${target.fullName}.`;
 
-    if (supabase) {
       setState((prev) => ({
         ...prev,
         profiles: prev.profiles.map((p) => (p.id === userId ? { ...p, active: nextActive } : p)),
+        ...withDemoMeta(prev, admin.id, ['toggle_user_active', target.email, detail]),
       }));
-      void (async () => {
-        await supabase.from('profiles').update({ active: nextActive }).eq('id', userId);
-        await appendLiveAdminLog('toggle_user_active', target.email, detail);
-      })();
-      return;
-    }
 
-    setState((prev) => ({
-      ...prev,
-      profiles: prev.profiles.map((p) => (p.id === userId ? { ...p, active: nextActive } : p)),
-      adminLog: [
-        makeLogEntry(currentUser.id, 'toggle_user_active', target.email, detail),
-        ...prev.adminLog,
-      ],
-    }));
-  };
-
-  const issueTempPassword = async (userId: string) => {
-    if (currentUser?.role !== 'admin' || userId === currentUser.id) {
-      return { ok: false, error: 'Unauthorized action.' };
-    }
-    const target = state.profiles.find((p) => p.id === userId);
-    if (!target) return { ok: false, error: 'Account not found.' };
-
-    if (supabase) {
-      const { data, error } = await supabase.functions.invoke<{
-        tempPassword?: string;
-        error?: string;
-      }>('admin-reset-password', { body: { targetUserId: userId } });
-      if (error || !data?.tempPassword) {
-        return { ok: false, error: data?.error ?? error?.message ?? 'Could not issue temporary password.' };
+      if (supabase) {
+        const client = supabase;
+        runLiveTask(async () => {
+          const { error } = await client
+            .from('profiles')
+            .update({ active: nextActive })
+            .eq('id', userId);
+          if (error) {
+            await hydrateUser(admin.id, true);
+            return;
+          }
+          await appendLiveAdminLog('toggle_user_active', target.email, detail);
+        });
       }
-      await hydrateUser(currentUser.id, true);
-      return { ok: true, tempPassword: data.tempPassword };
-    }
+    },
+    [appendLiveAdminLog, hydrateUser]
+  );
 
-    setState((prev) => ({
-      ...prev,
-      profiles: prev.profiles.map((p) =>
-        p.id === userId ? { ...p, mustChangePassword: true } : p
-      ),
-      adminLog: [
-        makeLogEntry(
-          currentUser.id,
-          'issue_temp_password',
-          target.email,
-          `Flagged ${target.fullName} for forced password reset.`
+  const issueTempPassword = useCallback(
+    async (userId: string, options?: { newPassword?: string; requireReset?: boolean }) => {
+      const admin = currentUserRef.current;
+      if (admin?.role !== 'admin' || userId === admin.id) {
+        return { ok: false, error: 'Unauthorized action.' };
+      }
+      const target = stateRef.current.profiles.find((p) => p.id === userId);
+      if (!target) return { ok: false, error: 'Account not found.' };
+
+      const customPassword = options?.newPassword ?? '';
+      const requireReset = options?.requireReset ?? true;
+      if (customPassword && (customPassword.length < 8 || customPassword.length > 72)) {
+        return { ok: false, error: 'New password must be between 8 and 72 characters.' };
+      }
+
+      if (supabase) {
+        const { data, error } = await supabase.functions.invoke<{
+          tempPassword?: string;
+          error?: string;
+        }>('admin-reset-password', {
+          body: {
+            targetUserId: userId,
+            ...(customPassword ? { newPassword: customPassword } : {}),
+            requireReset,
+          },
+        });
+        if (error || !data?.tempPassword) {
+          return { ok: false, error: data?.error ?? error?.message ?? 'Could not update password.' };
+        }
+        await hydrateUser(admin.id, true);
+        return { ok: true, tempPassword: data.tempPassword };
+      }
+
+      const nextPassword = customPassword || generateTempPassword();
+      const detail = customPassword
+        ? `Set new password for ${target.fullName}${requireReset ? ' (forced reset on next sign-in)' : ''}.`
+        : `Issued temporary password for ${target.fullName}${requireReset ? ' (forced reset on next sign-in)' : ''}.`;
+
+      setState((prev) => ({
+        ...prev,
+        profiles: prev.profiles.map((p) =>
+          p.id === userId ? { ...p, mustChangePassword: requireReset } : p
         ),
-        ...prev.adminLog,
-      ],
-    }));
-    return { ok: true };
-  };
+        ...withDemoMeta(prev, admin.id, ['issue_temp_password', target.email, detail]),
+      }));
+      return { ok: true, tempPassword: nextPassword };
+    },
+    [hydrateUser]
+  );
 
   const isAdmin = currentUser?.role === 'admin';
   const exposedItems = useMemo(
     () =>
       isAdmin
         ? state.items
-        : state.items.map((item) => (item.hidePhoto ? { ...item, images: [] } : item)),
+        : state.items.map((item) =>
+            item.hidePhoto && item.images.length > 0 ? { ...item, images: EMPTY_IMAGES } : item
+          ),
     [state.items, isAdmin]
   );
 
-  return (
-    <LostLinkContext.Provider
-      value={{
-        ...state,
-        items: exposedItems,
-        adminLog: isAdmin ? state.adminLog : [],
-        currentUser,
-        authReady,
-        isLiveBackend: Boolean(supabase),
-        signIn,
-        signInDemoRole,
-        registerAccount,
-        completePasswordReset,
-        signOut,
-        createItem,
-        deleteItem,
-        submitClaim,
-        submitSighting,
-        withdrawClaim,
-        markNotificationRead,
-        markAllNotificationsRead,
-        confirmIntake,
-        rejectIntake,
-        toggleItemPhotoShield,
-        verifyClaim,
-        extendCustody,
-        markDonationTurnover,
-        publishBroadcast,
-        removeBroadcast,
-        updateUserRole,
-        toggleUserActive,
-        issueTempPassword,
-      }}
-    >
-      {children}
-    </LostLinkContext.Provider>
+  const contextValue = useMemo<LostLinkContextValue>(
+    () => ({
+      ...state,
+      items: exposedItems,
+      adminLog: isAdmin ? state.adminLog : EMPTY_STATE.adminLog,
+      currentUser,
+      authReady,
+      isLiveBackend: Boolean(supabase),
+      signIn,
+      signInDemoRole,
+      registerAccount,
+      completePasswordReset,
+      signOut,
+      createItem,
+      deleteItem,
+      submitClaim,
+      submitSighting,
+      withdrawClaim,
+      markNotificationRead,
+      markAllNotificationsRead,
+      confirmIntake,
+      rejectIntake,
+      toggleItemPhotoShield,
+      verifyClaim,
+      extendCustody,
+      markDonationTurnover,
+      publishBroadcast,
+      removeBroadcast,
+      updateUserRole,
+      toggleUserActive,
+      issueTempPassword,
+    }),
+    [
+      state,
+      exposedItems,
+      isAdmin,
+      currentUser,
+      authReady,
+      signIn,
+      signInDemoRole,
+      registerAccount,
+      completePasswordReset,
+      signOut,
+      createItem,
+      deleteItem,
+      submitClaim,
+      submitSighting,
+      withdrawClaim,
+      markNotificationRead,
+      markAllNotificationsRead,
+      confirmIntake,
+      rejectIntake,
+      toggleItemPhotoShield,
+      verifyClaim,
+      extendCustody,
+      markDonationTurnover,
+      publishBroadcast,
+      removeBroadcast,
+      updateUserRole,
+      toggleUserActive,
+      issueTempPassword,
+    ]
   );
+
+  return <LostLinkContext.Provider value={contextValue}>{children}</LostLinkContext.Provider>;
 }
 
 export function useLostLink() {

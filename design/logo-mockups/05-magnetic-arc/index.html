@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logo Concept 05 — Orbit Snap · LostLink Rebrand</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f6f7f2;
+      --paper-2: #ecefe7;
+      --surface: #ffffff;
+      --ink: #0a0a0a;
+      --muted: #454545;
+      --forest: #1f6b3a;
+      --forest-deep: #134e3a;
+      --lime: #daef8a;
+      --line: rgba(10, 10, 10, 0.11);
+      --line-strong: rgba(10, 10, 10, 0.2);
+      --sans: "Outfit", system-ui, -apple-system, sans-serif;
+      --mono: "DM Mono", ui-monospace, Menlo, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 24px 72px;
+      display: grid;
+      gap: 28px;
+    }
+    .top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+    }
+    .top h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 32px);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+    .top p {
+      margin: 6px 0 0;
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 60ch;
+    }
+    .tag {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink);
+      background: var(--lime);
+      border: 1px solid #c2d96c;
+      padding: 5px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .hero-stage {
+      display: grid;
+      place-items: center;
+      min-height: 320px;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 16px;
+      padding: 48px 24px;
+    }
+    .lockup {
+      display: inline-flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .wordmark {
+      font-size: clamp(36px, 5vw, 52px);
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      line-height: 1;
+      color: var(--ink);
+    }
+    .surfaces {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .swatch {
+      padding: 36px 24px 24px;
+      display: grid;
+      justify-items: center;
+      gap: 22px;
+    }
+    .swatch span {
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+    .s-paper { background: var(--paper); color: var(--muted); }
+    .s-forest { background: var(--forest-deep); color: #d6e7dd; }
+    .s-dark { background: #0a0a0a; color: #a3a3a3; }
+    .s-mono { background: var(--surface); color: var(--muted); }
+    .bar-preview {
+      background: var(--paper);
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      padding: 14px 22px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .bar-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+    .bar-nav {
+      display: flex;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .bar-nav span {
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    .bar-nav .active {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--line-strong);
+      font-weight: 500;
+    }
+    .bar-cta {
+      background: var(--forest);
+      color: #ffffff;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+    .scale-card {
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .scales {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 24px;
+    }
+    .sz {
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .tab-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--paper-2);
+      border: 1px solid var(--line-strong);
+      border-radius: 10px 10px 0 0;
+      padding: 8px 14px;
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div>
+        <h1>Concept 05 — Orbit Snap</h1>
+        <p>Abstract 2-path rebrand: two opposing magnetic arcs snapping together around a central optical lens — lost property and owner pulled back into alignment.</p>
+      </div>
+      <span class="tag">REBRAND AREA 05 / 06</span>
+    </header>
+
+    <section class="hero-stage" aria-label="Primary lockup">
+      <div class="lockup">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="76" height="76" role="img" aria-label="LostLink Orbit Snap mark">
+          <rect width="64" height="64" rx="16" fill="#134e3a" />
+          <g fill="none" stroke-width="7.2" stroke-linecap="round">
+            <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+            <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+          </g>
+        </svg>
+        <span class="wordmark">LostLink</span>
+      </div>
+    </section>
+
+    <section class="bar-preview" aria-label="Portal header preview">
+      <div class="bar-brand">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="40" height="40" aria-hidden="true">
+          <rect width="64" height="64" rx="16" fill="#134e3a" />
+          <g fill="none" stroke-width="7.2" stroke-linecap="round">
+            <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+            <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+          </g>
+        </svg>
+        <span>LostLink</span>
+      </div>
+      <div class="bar-nav">
+        <span class="active">Campus Feed</span>
+        <span>My Activity</span>
+        <span>DO Console</span>
+      </div>
+      <span class="bar-cta">Report item</span>
+    </section>
+
+    <section class="surfaces" aria-label="Surface contrast tests">
+      <div class="swatch s-paper">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <rect width="64" height="64" rx="16" fill="#134e3a" />
+          <g fill="none" stroke-width="7.2" stroke-linecap="round">
+            <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+            <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+          </g>
+        </svg>
+        <span>Sage paper · #f6f7f2</span>
+      </div>
+      <div class="swatch s-forest">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <g fill="none" stroke-width="7.2" stroke-linecap="round">
+            <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+            <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+          </g>
+        </svg>
+        <span>Forest unboxed · #134e3a</span>
+      </div>
+      <div class="swatch s-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <rect width="64" height="64" rx="16" fill="#171717" />
+          <g fill="none" stroke-width="7.2" stroke-linecap="round">
+            <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+            <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+          </g>
+        </svg>
+        <span>Inverse dark · #0a0a0a</span>
+      </div>
+      <div class="swatch s-mono">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <g fill="none" stroke-width="7.2" stroke-linecap="round">
+            <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#0a0a0a" />
+            <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#0a0a0a" opacity="0.45" />
+          </g>
+        </svg>
+        <span>Monochrome print stamp</span>
+      </div>
+    </section>
+
+    <section class="scale-card" aria-label="Optical scale test">
+      <div class="scales">
+        <div class="sz">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+            <rect width="64" height="64" rx="16" fill="#134e3a" />
+            <g fill="none" stroke-width="7.2" stroke-linecap="round">
+              <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+              <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+            </g>
+          </svg>
+          <span>64px</span>
+        </div>
+        <div class="sz">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+            <rect width="64" height="64" rx="16" fill="#134e3a" />
+            <g fill="none" stroke-width="7.2" stroke-linecap="round">
+              <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+              <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+            </g>
+          </svg>
+          <span>44px</span>
+        </div>
+        <div class="sz">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32" aria-hidden="true">
+            <rect width="64" height="64" rx="16" fill="#134e3a" />
+            <g fill="none" stroke-width="7.2" stroke-linecap="round">
+              <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+              <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+            </g>
+          </svg>
+          <span>32px</span>
+        </div>
+        <div class="sz">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="24" height="24" aria-hidden="true">
+            <rect width="64" height="64" rx="16" fill="#134e3a" />
+            <g fill="none" stroke-width="7.2" stroke-linecap="round">
+              <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+              <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+            </g>
+          </svg>
+          <span>24px</span>
+        </div>
+        <div class="sz">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="16" height="16" aria-hidden="true">
+            <rect width="64" height="64" rx="16" fill="#134e3a" />
+            <g fill="none" stroke-width="7.2" stroke-linecap="round">
+              <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+              <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+            </g>
+          </svg>
+          <span>16px</span>
+        </div>
+      </div>
+
+      <div class="tab-pill">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="16" height="16" aria-hidden="true">
+          <rect width="64" height="64" rx="16" fill="#134e3a" />
+          <g fill="none" stroke-width="7.2" stroke-linecap="round">
+            <path d="M18.2 33.8 A11 11 0 1 1 37 26" stroke="#f6f7f2" />
+            <path d="M45.8 30.2 A11 11 0 1 1 27 38" stroke="#daef8a" />
+          </g>
+        </svg>
+        <span>LostLink · DLSAU</span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

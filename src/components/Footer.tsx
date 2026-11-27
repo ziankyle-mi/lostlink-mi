@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useLostLink } from '../lib/store';
 
+const FOOTER_LINK =
+  'inline-flex min-h-[44px] items-center hover:text-[#0a0a0a] hover:underline underline-offset-4';
+
 export function Footer() {
   const { currentUser } = useLostLink();
 
@@ -11,18 +14,18 @@ export function Footer() {
         <nav className="flex flex-wrap items-center gap-5" aria-label="Portal links">
           {currentUser && (
             <>
-              <Link to="/feed" className="inline-flex min-h-[44px] items-center hover:text-[#0a0a0a] hover:underline underline-offset-4">
+              <Link to="/feed" className={FOOTER_LINK}>
                 Campus Feed
               </Link>
-              <Link to="/profile" className="inline-flex min-h-[44px] items-center hover:text-[#0a0a0a] hover:underline underline-offset-4">
+              <Link to="/profile" className={FOOTER_LINK}>
                 My Activity
               </Link>
             </>
           )}
-          <Link to="/privacy" className="inline-flex min-h-[44px] items-center hover:text-[#0a0a0a] hover:underline underline-offset-4">
+          <Link to="/privacy" className={FOOTER_LINK}>
             Privacy Policy
           </Link>
-          <Link to="/terms" className="inline-flex min-h-[44px] items-center hover:text-[#0a0a0a] hover:underline underline-offset-4">
+          <Link to="/terms" className={FOOTER_LINK}>
             Terms of Use
           </Link>
         </nav>

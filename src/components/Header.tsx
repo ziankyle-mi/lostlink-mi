@@ -63,7 +63,28 @@ function DlsauSeal({ showName = false }: { showName?: boolean }) {
   );
 }
 
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors ${isActive
+    ? 'border border-[var(--color-line-strong)] bg-white text-[#0a0a0a]'
+    : 'text-[#454545] hover:bg-white hover:text-[#0a0a0a]'
+  }`;
+
 export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
+  if (variant === 'auth') {
+    return (
+      <header className="border-b border-[var(--color-line)] bg-[#f6f7f2]">
+        <div className="mx-auto flex min-h-[72px] w-full max-w-[1280px] items-center justify-between gap-3 px-6 py-2 sm:px-12 lg:px-20">
+          <LostLinkLogo />
+          <DlsauSeal showName />
+        </div>
+      </header>
+    );
+  }
+
+  return <AppHeader onOpenReport={onOpenReport} />;
+}
+
+function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
   const {
     currentUser,
     notifications,
@@ -82,6 +103,7 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
 
   useEffect(() => {
     setMobileNavOpen(false);
+    setNotifOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -119,7 +141,7 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
 
   useEffect(() => {
     if (!notifOpen) return;
-    const onPointerDown = (e: MouseEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (notifWrapRef.current && !notifWrapRef.current.contains(e.target as Node)) {
         setNotifOpen(false);
       }
@@ -127,10 +149,10 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setNotifOpen(false);
     };
-    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [notifOpen]);
@@ -144,17 +166,6 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
     void signOut();
   };
 
-  if (variant === 'auth') {
-    return (
-      <header className="border-b border-[var(--color-line)] bg-[#f6f7f2]">
-        <div className="mx-auto flex min-h-[72px] w-full max-w-[1280px] items-center justify-between gap-3 px-6 py-2 sm:px-12 lg:px-20">
-          <LostLinkLogo />
-          <DlsauSeal showName />
-        </div>
-      </header>
-    );
-  }
-
   const portalLinks = [
     { to: '/feed', label: 'Campus Feed', end: false },
     { to: '/profile', label: 'My Activity', end: false },
@@ -165,12 +176,6 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
       ]
       : []),
   ];
-
-  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors ${isActive
-      ? 'border border-[var(--color-line-strong)] bg-white text-[#0a0a0a]'
-      : 'text-[#454545] hover:bg-white hover:text-[#0a0a0a]'
-    }`;
 
   return (
     <header className="sm:sticky sm:top-0 z-20 border-b border-[var(--color-line)] bg-[#f6f7f2]">
@@ -229,8 +234,8 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
                 aria-label="Account notifications"
                 className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-24px),360px)] overflow-hidden rounded-xl border border-[var(--color-line-strong)] bg-white shadow-[0_18px_40px_-12px_rgba(10,10,10,0.22)]"
               >
-                <div className="flex items-center justify-between gap-2 border-b border-[var(--color-line)] bg-[#f6f7f2] px-4 py-3">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 border-b border-[var(--color-line)] bg-[#f6f7f2] px-4 py-1.5">
+                  <div className="flex items-center gap-2 py-1.5">
                     <span className="text-sm font-semibold text-[#0a0a0a]">Notifications</span>
                     {unreadCount > 0 && (
                       <span className="rounded-full bg-[#e7f3ea] px-2 py-0.5 font-mono text-[11px] font-medium text-[#15522b]">
@@ -242,7 +247,7 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
                     <button
                       type="button"
                       onClick={markAllNotificationsRead}
-                      className="inline-flex min-h-[32px] items-center gap-1 rounded-md px-2 text-xs font-medium text-[#1f6b3a] hover:bg-[#e7f3ea] cursor-pointer"
+                      className="inline-flex min-h-[44px] items-center gap-1 rounded-md px-2 text-xs font-medium text-[#1f6b3a] hover:bg-[#e7f3ea] cursor-pointer"
                     >
                       <Check className="h-3.5 w-3.5" aria-hidden="true" />
                       Mark all read
@@ -263,7 +268,7 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
                         onClick={() => {
                           if (!n.read) markNotificationRead(n.id);
                         }}
-                        className={`flex w-full items-start gap-2.5 px-4 py-3 text-left transition-colors cursor-pointer ${n.read
+                        className={`flex min-h-[44px] w-full items-start gap-2.5 px-4 py-3 text-left transition-colors cursor-pointer ${n.read
                             ? 'bg-white hover:bg-[#f6f7f2]'
                             : 'bg-[#e7f3ea]/45 hover:bg-[#e7f3ea]/75'
                           }`}
@@ -289,11 +294,11 @@ export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
                   )}
                 </div>
 
-                <div className="border-t border-[var(--color-line)] bg-[#f6f7f2] px-4 py-2.5 text-right">
+                <div className="border-t border-[var(--color-line)] bg-[#f6f7f2] px-4 py-1 text-right">
                   <Link
                     to="/profile"
                     onClick={() => setNotifOpen(false)}
-                    className="inline-flex min-h-[36px] items-center text-xs font-medium text-[#1f6b3a] underline-offset-4 hover:underline"
+                    className="inline-flex min-h-[44px] items-center text-xs font-medium text-[#1f6b3a] underline-offset-4 hover:underline"
                   >
                     View all in My Activity
                   </Link>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { LostLinkProvider, useLostLink } from './lib/store';
 import { LandingPage } from './pages/LandingPage';
@@ -18,9 +18,11 @@ const ResetPasswordPage = lazy(() =>
   import('./pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage }))
 );
 
+const PAGE_FALLBACK = <div className="min-h-[100svh] bg-[#f6f7f2]" />;
+
 function RequireAuth({ children }: { children: ReactNode }) {
   const { currentUser, authReady } = useLostLink();
-  if (!authReady) return <div className="min-h-[100svh] bg-[#f6f7f2]" />;
+  if (!authReady) return PAGE_FALLBACK;
   if (!currentUser) return <Navigate to="/login" replace />;
   if (currentUser.mustChangePassword) return <Navigate to="/reset-password" replace />;
   return <>{children}</>;
@@ -28,7 +30,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 function RequireAdmin({ children }: { children: ReactNode }) {
   const { currentUser, authReady } = useLostLink();
-  if (!authReady) return <div className="min-h-[100svh] bg-[#f6f7f2]" />;
+  if (!authReady) return PAGE_FALLBACK;
   if (!currentUser) return <Navigate to="/login" replace />;
   if (currentUser.mustChangePassword) return <Navigate to="/reset-password" replace />;
   if (currentUser.role !== 'admin') return <Navigate to="/feed" replace />;
@@ -37,7 +39,7 @@ function RequireAdmin({ children }: { children: ReactNode }) {
 
 function RequirePasswordReset({ children }: { children: ReactNode }) {
   const { currentUser, authReady } = useLostLink();
-  if (!authReady) return <div className="min-h-[100svh] bg-[#f6f7f2]" />;
+  if (!authReady) return PAGE_FALLBACK;
   if (!currentUser) return <Navigate to="/login" replace />;
   if (!currentUser.mustChangePassword) {
     return <Navigate to={currentUser.role === 'admin' ? '/admin' : '/feed'} replace />;
@@ -49,14 +51,17 @@ function AppRoutes() {
   const { pathname } = useLocation();
   const isLanding = pathname === '/';
   // Keep the landing iframe mounted once visited so returning to `/` is instant (no 2s cold reload).
-  const [landingMounted, setLandingMounted] = useState(isLanding);
-  if (isLanding && !landingMounted) setLandingMounted(true);
+  const [landingVisited, setLandingVisited] = useState(isLanding);
+  useEffect(() => {
+    if (isLanding && !landingVisited) setLandingVisited(true);
+  }, [isLanding, landingVisited]);
+  const landingMounted = landingVisited || isLanding;
 
   return (
     <>
       {landingMounted && <LandingPage active={isLanding} />}
       {!isLanding && (
-        <Suspense fallback={<div className="min-h-[100svh] bg-[#f6f7f2]" />}>
+        <Suspense fallback={PAGE_FALLBACK}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />

@@ -7,6 +7,78 @@ import { Tooltip } from '../components/InfoTip';
 import { useFieldValidation, ValidationBubble } from '../components/ValidationBubble';
 import { useLostLink } from '../lib/store';
 
+interface PasswordFieldProps {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  placeholder: string;
+  visible: boolean;
+  toggleLabel: string;
+  errorId: string;
+  error?: string;
+  ariaProps: { 'aria-invalid': boolean; 'aria-describedby'?: string };
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  onToggleVisible: () => void;
+}
+
+function PasswordField({
+  id,
+  name,
+  label,
+  value,
+  placeholder,
+  visible,
+  toggleLabel,
+  errorId,
+  error,
+  ariaProps,
+  onChange,
+  onBlur,
+  onToggleVisible,
+}: PasswordFieldProps) {
+  return (
+    <div className="grid gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium">
+        {label}
+      </label>
+      <div className="relative flex items-center">
+        <input
+          id={id}
+          name={name}
+          type={visible ? 'text' : 'password'}
+          autoComplete="new-password"
+          required
+          minLength={8}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          {...ariaProps}
+          placeholder={placeholder}
+          className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white pl-3 pr-12 text-base"
+        />
+        <Tooltip text={visible ? 'Hide password' : 'Show password'} className="absolute right-0.5">
+          <button
+            type="button"
+            onClick={onToggleVisible}
+            aria-label={visible ? `Hide ${toggleLabel}` : `Show ${toggleLabel}`}
+            aria-pressed={visible}
+            className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
+          >
+            {visible ? (
+              <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
+            ) : (
+              <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
+            )}
+          </button>
+        </Tooltip>
+      </div>
+      <ValidationBubble id={errorId} message={error} />
+    </div>
+  );
+}
+
 export function ResetPasswordPage() {
   const { currentUser, completePasswordReset, signOut } = useLostLink();
   const navigate = useNavigate();
@@ -37,6 +109,7 @@ export function ResetPasswordPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     setError(null);
     const ok = validation.validateAll(
       { password, confirm },
@@ -79,89 +152,48 @@ export function ResetPasswordPage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="mt-5 grid gap-4">
-            <div className="grid gap-1.5">
-              <label htmlFor="reset-password" className="text-sm font-medium">
-                New password
-              </label>
-              <div className="relative flex items-center">
-                <input
-                  id="reset-password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setPassword(next);
-                    validation.handleChange('password', next);
-                    if (validation.errors.confirm && confirm === next) {
-                      validation.setFieldError('confirm', null);
-                    }
-                  }}
-                  onBlur={() => validation.handleBlur('password', password)}
-                  {...validation.ariaFor('password', 'reset-password-err')}
-                  placeholder="At least 8 characters"
-                  className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white pl-3 pr-12 text-base"
-                />
-                <Tooltip
-                  text={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-0.5"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Hide new password' : 'Show new password'}
-                    aria-pressed={showPassword}
-                    className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
-                  </button>
-                </Tooltip>
-              </div>
-              <ValidationBubble id="reset-password-err" message={validation.errors.password} />
-            </div>
+            <PasswordField
+              id="reset-password"
+              name="password"
+              label="New password"
+              value={password}
+              placeholder="At least 8 characters"
+              visible={showPassword}
+              toggleLabel="new password"
+              errorId="reset-password-err"
+              error={validation.errors.password}
+              ariaProps={validation.ariaFor('password', 'reset-password-err')}
+              onChange={(next) => {
+                setPassword(next);
+                if (error) setError(null);
+                validation.handleChange('password', next);
+                if (validation.errors.confirm && confirm === next) {
+                  validation.setFieldError('confirm', null);
+                }
+              }}
+              onBlur={() => validation.handleBlur('password', password)}
+              onToggleVisible={() => setShowPassword((v) => !v)}
+            />
 
-            <div className="grid gap-1.5">
-              <label htmlFor="reset-confirm" className="text-sm font-medium">
-                Confirm new password
-              </label>
-              <div className="relative flex items-center">
-                <input
-                  id="reset-confirm"
-                  name="confirm"
-                  type={showConfirm ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  value={confirm}
-                  onChange={(e) => {
-                    setConfirm(e.target.value);
-                    validation.handleChange('confirm', e.target.value);
-                  }}
-                  onBlur={() => validation.handleBlur('confirm', confirm)}
-                  {...validation.ariaFor('confirm', 'reset-confirm-err')}
-                  placeholder="Re-enter your new password"
-                  className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white pl-3 pr-12 text-base"
-                />
-                <Tooltip
-                  text={showConfirm ? 'Hide password' : 'Show password'}
-                  className="absolute right-0.5"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm((v) => !v)}
-                    aria-label={showConfirm ? 'Hide confirm password' : 'Show confirm password'}
-                    aria-pressed={showConfirm}
-                    className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
-                  >
-                    {showConfirm ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
-                  </button>
-                </Tooltip>
-              </div>
-              <ValidationBubble id="reset-confirm-err" message={validation.errors.confirm} />
-            </div>
+            <PasswordField
+              id="reset-confirm"
+              name="confirm"
+              label="Confirm new password"
+              value={confirm}
+              placeholder="Re-enter your new password"
+              visible={showConfirm}
+              toggleLabel="confirm password"
+              errorId="reset-confirm-err"
+              error={validation.errors.confirm}
+              ariaProps={validation.ariaFor('confirm', 'reset-confirm-err')}
+              onChange={(next) => {
+                setConfirm(next);
+                if (error) setError(null);
+                validation.handleChange('confirm', next);
+              }}
+              onBlur={() => validation.handleBlur('confirm', confirm)}
+              onToggleVisible={() => setShowConfirm((v) => !v)}
+            />
 
             {error && (
               <p

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Footer } from '../components/Footer';
@@ -7,6 +7,20 @@ import { Tooltip } from '../components/InfoTip';
 import { useFieldValidation, ValidationBubble } from '../components/ValidationBubble';
 import { useLostLink } from '../lib/store';
 import { isDlsauEmail } from '../lib/validation';
+
+const LOGIN_VALIDATORS = {
+  email: (v: string) => {
+    const clean = v.trim();
+    if (!clean) return 'Enter your @dlsau.edu.ph email address.';
+    if (!isDlsauEmail(clean)) return 'Use a valid @dlsau.edu.ph email (e.g. name@dlsau.edu.ph).';
+    return null;
+  },
+  password: (v: string) => {
+    if (!v) return 'Enter your password.';
+    if (v.length < 6) return 'Password must be at least 6 characters.';
+    return null;
+  },
+};
 
 export function LoginPage() {
   const { signIn, signInDemoRole, isLiveBackend } = useLostLink();
@@ -19,26 +33,11 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const validators = useMemo(
-    () => ({
-      email: (v: string) => {
-        const clean = v.trim();
-        if (!clean) return 'Enter your @dlsau.edu.ph email address.';
-        if (!isDlsauEmail(clean)) return 'Use a valid @dlsau.edu.ph email (e.g. name@dlsau.edu.ph).';
-        return null;
-      },
-      password: (v: string) => {
-        if (!v) return 'Enter your password.';
-        if (v.length < 6) return 'Password must be at least 6 characters.';
-        return null;
-      },
-    }),
-    []
-  );
-  const validation = useFieldValidation(validators);
+  const validation = useFieldValidation(LOGIN_VALIDATORS);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     setError(null);
     const ok = validation.validateAll(
       { email, password },
@@ -81,7 +80,7 @@ export function LoginPage() {
             <div className="border-b border-[var(--color-line)] pb-5">
               <Link
                 to="/"
-                className="mb-2 inline-flex min-h-[36px] items-center gap-1.5 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
+                className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
               >
                 <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                 Back to LostLink
@@ -111,6 +110,7 @@ export function LoginPage() {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
+                    if (error) setError(null);
                     validation.handleChange('email', e.target.value);
                   }}
                   onBlur={() => validation.handleBlur('email', email)}
@@ -136,6 +136,7 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
+                      if (error) setError(null);
                       validation.handleChange('password', e.target.value);
                     }}
                     onBlur={() => validation.handleBlur('password', password)}
@@ -154,7 +155,11 @@ export function LoginPage() {
                       aria-pressed={showPassword}
                       className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                      {showPassword ? (
+                        <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
+                      ) : (
+                        <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
+                      )}
                     </button>
                   </Tooltip>
                 </div>
@@ -207,14 +212,14 @@ export function LoginPage() {
                     <button
                       type="button"
                       onClick={() => handleQuickDemo('student')}
-                      className="min-h-[36px] rounded-md border border-[var(--color-line-strong)] px-2.5 font-medium text-[#0a0a0a] hover:bg-[#f6f7f2] cursor-pointer"
+                      className="min-h-[44px] rounded-md border border-[var(--color-line-strong)] px-3 font-medium text-[#0a0a0a] hover:bg-[#f6f7f2] cursor-pointer"
                     >
                       Student view
                     </button>
                     <button
                       type="button"
                       onClick={() => handleQuickDemo('admin')}
-                      className="min-h-[36px] rounded-md border border-[var(--color-line-strong)] px-2.5 font-medium text-[#0a0a0a] hover:bg-[#f6f7f2] cursor-pointer"
+                      className="min-h-[44px] rounded-md border border-[var(--color-line-strong)] px-3 font-medium text-[#0a0a0a] hover:bg-[#f6f7f2] cursor-pointer"
                     >
                       DO Admin view
                     </button>

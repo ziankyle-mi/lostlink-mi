@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 
 interface PhotoSliderProps {
@@ -17,6 +17,11 @@ export function PhotoSlider({
   compact = false,
 }: PhotoSliderProps) {
   const [index, setIndex] = useState(0);
+  const firstImage = images[0];
+
+  useEffect(() => {
+    setIndex(0);
+  }, [firstImage, images.length]);
 
   if ((shielded && !adminUnlocked) || images.length === 0) {
     return (
@@ -48,9 +53,9 @@ export function PhotoSlider({
       >
         {images.map((src, i) => (
           <img
-            key={`${src}-${i}`}
+            key={`${i}-${src.length}`}
             src={src}
-            alt={alt}
+            alt={images.length > 1 ? `${alt} (photo ${i + 1} of ${images.length})` : alt}
             loading="lazy"
             className="h-full w-full shrink-0 object-cover transition-transform duration-200 group-hover:scale-[1.03]"
           />

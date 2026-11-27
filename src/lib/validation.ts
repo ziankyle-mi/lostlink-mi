@@ -2,6 +2,19 @@ const DLSAU_EMAIL_RE = /^[^@\s]+@dlsau\.edu\.ph$/i;
 const STUDENT_ID_RE = /^[0-9]{4}-00-[0-9]{6}$/;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const TEMP_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+
+/** Generate a readable 12-character temporary password formatted as LL-XXXX-XXXX-XXXX. */
+export function generateTempPassword(): string {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  let out = 'LL-';
+  for (let i = 0; i < bytes.length; i++) {
+    if (i === 4 || i === 8) out += '-';
+    out += TEMP_PASSWORD_ALPHABET[bytes[i] % TEMP_PASSWORD_ALPHABET.length];
+  }
+  return out;
+}
 
 export function isDlsauEmail(email: string): boolean {
   return DLSAU_EMAIL_RE.test(email.trim());

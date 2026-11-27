@@ -9,6 +9,9 @@ import { PROGRAMS_BY_COLLEGE, useLostLink } from '../lib/store';
 import { isDlsauEmail, isStudentId } from '../lib/validation';
 import type { AccountType } from '../types';
 
+const COLLEGE_PROGRAM_GROUPS = Object.entries(PROGRAMS_BY_COLLEGE);
+const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', '6th Year'] as const;
+
 export function RegisterPage() {
   const { registerAccount } = useLostLink();
   const navigate = useNavigate();
@@ -57,6 +60,7 @@ export function RegisterPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     setError(null);
     setConfirmNotice(null);
     const ok = validation.validateAll(
@@ -112,7 +116,7 @@ export function RegisterPage() {
           <div className="border-b border-[var(--color-line)] pb-5">
             <Link
               to="/"
-              className="mb-2 inline-flex min-h-[36px] items-center gap-1.5 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
+              className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
               Back to LostLink
@@ -213,7 +217,7 @@ export function RegisterPage() {
                 onChange={(e) => setProgram(e.target.value)}
                 className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white px-3 text-base"
               >
-                {Object.entries(PROGRAMS_BY_COLLEGE).map(([college, list]) => (
+                {COLLEGE_PROGRAM_GROUPS.map(([college, list]) => (
                   <optgroup key={college} label={college}>
                     {list.map((code) => (
                       <option key={code} value={code}>
@@ -268,7 +272,7 @@ export function RegisterPage() {
                     onChange={(e) => setYearLevel(e.target.value)}
                     className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white px-3 text-base"
                   >
-                    {['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', '6th Year'].map((y) => (
+                    {YEAR_LEVELS.map((y) => (
                       <option key={y} value={y}>
                         {y}
                       </option>
@@ -311,7 +315,11 @@ export function RegisterPage() {
                     aria-pressed={showPassword}
                     className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
                   >
-                    {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                    {showPassword ? (
+                      <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
+                    )}
                   </button>
                 </Tooltip>
               </div>
