@@ -10,4 +10,4 @@ This system acts as the official De La Salle Araneta University (DLSAU) Lost & F
 
 ## Members
 - Manuel Zian Kyle Piangco
-- Joshua Enriquez
+- Joshua R. Enriquez
