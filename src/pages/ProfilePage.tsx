@@ -348,6 +348,7 @@ export function ProfilePage() {
                 </p>
                 <Link
                   to="/feed"
+                  viewTransition
                   className="inline-flex min-h-[44px] items-center rounded-lg bg-[#1f6b3a] px-4 text-sm font-medium text-white transition-colors hover:bg-[#19562e]"
                 >
                   Browse Campus Feed
@@ -470,6 +471,7 @@ export function ProfilePage() {
                   ) : (
                     <Link
                       to="/feed"
+                      viewTransition
                       className="inline-flex min-h-[44px] shrink-0 items-center text-sm font-medium text-[#1f6b3a] underline-offset-4 hover:underline"
                     >
                       Browse feed

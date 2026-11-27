@@ -14,6 +14,12 @@
   --color-line-strong: rgba(10, 10, 10, 0.2);
 }
 
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 @layer base {
   html {
     background-color: #f6f7f2;
@@ -43,21 +49,53 @@
     outline-offset: 2px;
   }
 
+  main[tabindex="-1"]:focus,
+  main[tabindex="-1"]:focus-visible {
+    outline: none;
+  }
+
   ::selection {
     background: color-mix(in oklab, #1f6b3a 25%, transparent);
+  }
+
+  dialog {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+    transition:
+      opacity 150ms var(--ease-out),
+      transform 150ms var(--ease-out),
+      overlay 150ms allow-discrete,
+      display 150ms allow-discrete;
+  }
+
+  dialog[data-drawer] {
+    transform: translateX(28px);
+  }
+
+  dialog::backdrop {
+    opacity: 0;
+    transition:
+      opacity 150ms var(--ease-out),
+      overlay 150ms allow-discrete,
+      display 150ms allow-discrete;
   }
 
   dialog[open] {
     opacity: 1;
     transform: translateY(0) scale(1);
     transition:
-      opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
-      transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      opacity 200ms var(--ease-out),
+      transform 200ms var(--ease-out),
+      overlay 200ms allow-discrete,
+      display 200ms allow-discrete;
   }
 
   dialog[open]::backdrop {
     opacity: 1;
-    transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      opacity 200ms var(--ease-out),
+      overlay 200ms allow-discrete,
+      display 200ms allow-discrete;
   }
 
   @starting-style {
@@ -221,14 +259,163 @@ select[aria-invalid="true"]:focus-visible {
   transform: rotate(45deg);
 }
 
-/* Kept unlayered so reduced-motion overrides unlayered popover/bubble animations */
+/* Route View Transitions & Floating Panels */
+@keyframes ll-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ll-page-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes ll-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+header[data-site-header] {
+  view-transition-name: site-header;
+}
+
+footer[data-site-footer] {
+  view-transition-name: site-footer;
+}
+
+main {
+  view-transition-name: page-main;
+}
+
+.vt-nav-pill {
+  view-transition-name: portal-nav-pill;
+}
+
+.vt-landing-frame {
+  view-transition-name: landing-frame;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root) {
+  display: none;
+}
+
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 30;
+}
+
+::view-transition-group(site-footer) {
+  animation: none;
+  z-index: 20;
+}
+
+::view-transition-old(site-header):only-child,
+::view-transition-old(site-footer):only-child {
+  animation: 130ms var(--ease-out) reverse both ll-fade-in;
+}
+
+::view-transition-new(site-header):only-child,
+::view-transition-new(site-footer):only-child {
+  animation: 200ms var(--ease-out) both ll-fade-in;
+}
+
+::view-transition-old(page-main) {
+  animation: 130ms var(--ease-out) both ll-page-out;
+}
+
+::view-transition-new(page-main) {
+  animation: 210ms var(--ease-out) 30ms both ll-page-in;
+}
+
+::view-transition-old(landing-frame):only-child {
+  animation: 140ms var(--ease-out) reverse both ll-fade-in;
+}
+
+::view-transition-new(landing-frame):only-child {
+  animation: 210ms var(--ease-out) 30ms both ll-fade-in;
+}
+
+::view-transition-group(portal-nav-pill) {
+  animation-duration: 210ms;
+  animation-timing-function: var(--ease-out);
+  z-index: 40;
+}
+
+::view-transition-old(portal-nav-pill),
+::view-transition-new(portal-nav-pill) {
+  animation: none;
+  height: 100%;
+}
+
+::view-transition-old(portal-nav-pill):only-child {
+  animation: 120ms var(--ease-out) reverse both ll-fade-in;
+}
+
+::view-transition-new(portal-nav-pill):only-child {
+  animation: 180ms var(--ease-out) both ll-fade-in;
+}
+
+[data-popover-panel] {
+  transform-origin: top right;
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition:
+    opacity 160ms var(--ease-out),
+    transform 160ms var(--ease-out);
+}
+
+@starting-style {
+  [data-popover-panel] {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+
+/* Kept unlayered so reduced-motion overrides unlayered popover/bubble/view-transition animations */
 @media (prefers-reduced-motion: reduce) {
+  dialog,
   dialog[open],
+  dialog::backdrop,
   dialog[open]::backdrop,
   [data-infotip],
-  [data-validation-bubble] {
+  [data-validation-bubble],
+  [data-popover-panel] {
     transition: none;
     animation: none;
     transform: none;
+  }
+
+  ::view-transition-old(page-main),
+  ::view-transition-old(landing-frame):only-child {
+    animation: 120ms ease-out reverse both ll-fade-in;
+  }
+
+  ::view-transition-new(page-main),
+  ::view-transition-new(landing-frame):only-child {
+    animation: 140ms ease-out both ll-fade-in;
+  }
+
+  ::view-transition-group(portal-nav-pill) {
+    animation-duration: 0s !important;
   }
 }

@@ -55,6 +55,12 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
   const validation = useFieldValidation(proofValidators);
 
   const itemId = item?.id ?? null;
+  // Keep last inspected item rendered while <dialog> plays its 150ms exit transition.
+  const [renderedItem, setRenderedItem] = useState<Item | null>(item);
+  if (item && renderedItem !== item) {
+    setRenderedItem(item);
+  }
+  const activeItem = item ?? renderedItem;
 
   useEffect(() => {
     const el = dialogRef.current;
@@ -128,16 +134,20 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
   };
 
   const proofLen = proof.trim().length;
+  const shown = activeItem;
 
   return (
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onTransitionEnd={(e) => {
+        if (e.target === e.currentTarget && !e.currentTarget.open) setRenderedItem(null);
+      }}
       onClick={(e) => closeOnBackdrop(e, onClose)}
       aria-labelledby="inspect-dlg-title"
       className={DIALOG_SHELL}
     >
-      {item && (
+      {shown && (
         <>
           <div className="flex items-start justify-between gap-3 border-b border-[var(--color-line)] bg-[#f6f7f2] px-6 py-4">
             <div className="min-w-0">
@@ -145,9 +155,9 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
                 id="inspect-dlg-title"
                 className="truncate text-[19px] font-semibold leading-snug tracking-[-0.02em]"
               >
-                {item.name}
+                {shown.name}
               </h2>
-              <p className="mt-0.5 text-[13px] text-[#454545]">{item.custodyNote}</p>
+              <p className="mt-0.5 text-[13px] text-[#454545]">{shown.custodyNote}</p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close modal" className={CLOSE_BTN}>
               <X className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -157,16 +167,16 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
           <div className="grid gap-5 overflow-y-auto px-6 py-5 [scrollbar-color:rgba(10,10,10,0.22)_transparent] [scrollbar-width:thin]">
             <div className="aspect-video overflow-hidden rounded-xl border border-[var(--color-line)] bg-[#ecefe7]">
               <PhotoSlider
-                images={item.images}
-                alt={item.name}
-                shielded={item.hidePhoto}
+                images={shown.images}
+                alt={shown.name}
+                shielded={shown.hidePhoto}
                 adminUnlocked={isAdmin}
               />
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="min-w-0 flex-1 text-[15px] leading-relaxed text-[#454545]">
-                {item.description}
+                {shown.description}
               </p>
               <Tooltip text="Copy reference tag for LSB Room 102 custody desk">
                 <button
@@ -179,7 +189,7 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
                   ) : (
                     <Copy className="h-3.5 w-3.5 text-[#454545]" aria-hidden="true" />
                   )}
-                  <span>{copied ? `Copied ${item.referenceCode}` : item.referenceCode}</span>
+                  <span>{copied ? `Copied ${shown.referenceCode}` : shown.referenceCode}</span>
                 </button>
               </Tooltip>
             </div>
@@ -187,16 +197,16 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
             <dl className="grid grid-cols-1 gap-3 rounded-xl bg-[#f6f7f2] px-4 py-3 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-xs text-[#454545]">Building</dt>
-                <dd className="mt-0.5 font-medium text-[#0a0a0a]">{item.location}</dd>
+                <dd className="mt-0.5 font-medium text-[#0a0a0a]">{shown.location}</dd>
               </div>
               <div>
                 <dt className="text-xs text-[#454545]">Category</dt>
-                <dd className="mt-0.5 font-medium text-[#0a0a0a]">{item.category}</dd>
+                <dd className="mt-0.5 font-medium text-[#0a0a0a]">{shown.category}</dd>
               </div>
               <div>
                 <dt className="text-xs text-[#454545]">Date logged</dt>
                 <dd className="mt-0.5 font-mono text-[13px] font-medium text-[#0a0a0a]">
-                  {item.eventDate}
+                  {shown.eventDate}
                 </dd>
               </div>
             </dl>
@@ -206,18 +216,18 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1">
                     <label htmlFor="claim-proof-input" className="text-[13px] font-medium text-[#0a0a0a]">
-                      {item.type === 'found'
+                      {shown.type === 'found'
                         ? 'Ownership proof'
                         : 'Sighting or turn-in note'}
                     </label>
                     <Toggletip
                       label={
-                        item.type === 'found'
+                        shown.type === 'found'
                           ? 'About private ownership proof'
                           : 'About sighting notifications'
                       }
                       text={
-                        item.type === 'found'
+                        shown.type === 'found'
                           ? 'Kept private: only you and LSB Room 102 DO Admins can read your ownership proof.'
                           : 'Sent directly as an in-app notification to the owner without creating a custody claim.'
                       }
@@ -244,7 +254,7 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
                     minLength={20}
                     required
                     placeholder={
-                      item.type === 'found'
+                      shown.type === 'found'
                         ? 'Describe unique scratches, inside cards, stickers, or contents…'
                         : 'Share where and when you saw it, or if you turned it in at LSB Room 102…'
                     }
@@ -271,11 +281,11 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex h-[46px] w-full items-center justify-center rounded-lg bg-[#1f6b3a] text-[15px] font-medium text-white transition-all hover:bg-[#19562e] active:translate-y-px disabled:opacity-60 cursor-pointer"
+                  className="inline-flex h-[46px] w-full items-center justify-center rounded-lg bg-[#1f6b3a] text-[15px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-[#19562e] active:scale-[0.985] disabled:opacity-60 cursor-pointer"
                 >
                   {submitting
                     ? 'Sending…'
-                    : item.type === 'found'
+                    : shown.type === 'found'
                       ? 'Submit claim for LSB pickup'
                       : 'Send sighting to owner'}
                 </button>
@@ -287,23 +297,25 @@ export function InspectDialog({ item, onClose }: InspectDialogProps) {
                     Verify with your DLSAU account
                   </h3>
                   <p className="mt-1 text-sm leading-relaxed text-[#454545]">
-                    {item.type === 'found'
-                      ? `Sign in with @dlsau.edu.ph to submit private ownership proof for ${item.referenceCode} at LSB Room 102.`
-                      : `Sign in with @dlsau.edu.ph to send a sighting or turn-in note to the owner of ${item.referenceCode}.`}
+                    {shown.type === 'found'
+                      ? `Sign in with @dlsau.edu.ph to submit private ownership proof for ${shown.referenceCode} at LSB Room 102.`
+                      : `Sign in with @dlsau.edu.ph to send a sighting or turn-in note to the owner of ${shown.referenceCode}.`}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <Link
-                    to={`/login?next=${encodeURIComponent(`/feed?inspect=${item.id}`)}`}
+                    to={`/login?next=${encodeURIComponent(`/feed?inspect=${shown.id}`)}`}
+                    viewTransition
                     onClick={onClose}
-                    className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-[#1f6b3a] px-4 text-sm font-medium text-white transition-colors hover:bg-[#19562e]"
+                    className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-[#1f6b3a] px-4 text-sm font-medium text-white transition-[background-color,transform] duration-150 hover:bg-[#19562e] active:scale-[0.985]"
                   >
-                    {item.type === 'found' ? 'Sign in to claim' : 'Sign in to send sighting'}
+                    {shown.type === 'found' ? 'Sign in to claim' : 'Sign in to send sighting'}
                   </Link>
                   <Link
-                    to={`/register?next=${encodeURIComponent(`/feed?inspect=${item.id}`)}`}
+                    to={`/register?next=${encodeURIComponent(`/feed?inspect=${shown.id}`)}`}
+                    viewTransition
                     onClick={onClose}
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[var(--color-line-strong)] bg-white px-4 text-sm font-medium text-[#0a0a0a] transition-colors hover:bg-[#ecefe7]"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[var(--color-line-strong)] bg-white px-4 text-sm font-medium text-[#0a0a0a] transition-[background-color,transform] duration-150 hover:bg-[#ecefe7] active:scale-[0.985]"
                   >
                     Create account
                   </Link>

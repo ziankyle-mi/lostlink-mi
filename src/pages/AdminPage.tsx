@@ -154,6 +154,7 @@ export function AdminPage() {
             </div>
             <Link
               to="/admin/users"
+              viewTransition
               className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--color-line-strong)] bg-white px-4 text-sm font-medium hover:bg-[#f6f7f2]"
             >
               Manage {profiles.length} campus accounts

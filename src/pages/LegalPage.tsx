@@ -74,12 +74,14 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-line)] pt-4">
             <Link
               to={currentUser ? '/feed' : '/login'}
+              viewTransition
               className="inline-flex min-h-[44px] items-center text-sm font-medium text-[#1f6b3a] underline underline-offset-4"
             >
               Back to LostLink
             </Link>
             <Link
               to={kind === 'privacy' ? '/terms' : '/privacy'}
+              viewTransition
               className="inline-flex min-h-[44px] items-center text-sm font-medium text-[#454545] underline-offset-4 hover:text-[#0a0a0a] hover:underline"
             >
               {kind === 'privacy' ? 'Read Terms of Use' : 'Read Privacy Policy'}

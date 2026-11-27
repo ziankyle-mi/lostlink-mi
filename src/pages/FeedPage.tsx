@@ -119,7 +119,9 @@ export function FeedPage() {
   const openReport = useCallback(
     (kind: ItemType) => {
       if (!currentUser) {
-        navigate(`/login?next=${encodeURIComponent(`/feed?report=${kind}`)}`);
+        navigate(`/login?next=${encodeURIComponent(`/feed?report=${kind}`)}`, {
+          viewTransition: true,
+        });
         return;
       }
       setReportDefaultType(kind);

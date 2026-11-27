@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { preloadRoute } from '../lib/routes';
 import { useLostLink } from '../lib/store';
 
 interface LandingPageProps {
@@ -30,6 +31,16 @@ export function LandingPage({ active = true }: LandingPageProps) {
     syncAuthToIframe();
   }, [syncAuthToIframe]);
 
+  // Warm common destination chunks while idle on `/` so leaving the landing page never flashes blank.
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setTimeout(() => {
+      preloadRoute('/feed');
+      preloadRoute(currentUser ? (currentUser.role === 'admin' ? '/admin' : '/profile') : '/login');
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [active, currentUser]);
+
   // Intercept same-origin link clicks from the static landing iframe so they use
   // React Router instead of triggering a full target="_top" page reload.
   useEffect(() => {
@@ -44,7 +55,8 @@ export function LandingPage({ active = true }: LandingPageProps) {
       if (e.data?.type !== 'lostlink:navigate') return;
       const to = e.data.to;
       if (typeof to !== 'string' || !to.startsWith('/') || to.startsWith('//')) return;
-      navigate(to);
+      preloadRoute(to);
+      navigate(to, { viewTransition: true });
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
@@ -71,7 +83,7 @@ export function LandingPage({ active = true }: LandingPageProps) {
       title="LostLink · Campus lost and found for DLSAU"
       hidden={!active}
       aria-hidden={!active}
-      className={`${active ? 'block' : 'hidden'} h-[100dvh] w-full border-0 bg-[#f6f7f2]`}
+      className={`${active ? 'vt-landing-frame block' : 'hidden'} h-[100dvh] w-full border-0 bg-[#f6f7f2]`}
     />
   );
 }

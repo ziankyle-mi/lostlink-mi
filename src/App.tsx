@@ -1,24 +1,33 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  RouterProvider,
+  ScrollRestoration,
+  useLocation,
+} from 'react-router-dom';
+import {
+  LazyAdminPage,
+  LazyAdminUsersPage,
+  LazyFeedPage,
+  LazyLegalPage,
+  LazyLoginPage,
+  LazyProfilePage,
+  LazyRegisterPage,
+  LazyResetPasswordPage,
+} from './lib/routes';
 import { LostLinkProvider, useLostLink } from './lib/store';
 import { LandingPage } from './pages/LandingPage';
 
-const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() =>
-  import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage }))
-);
-const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
-const AdminUsersPage = lazy(() =>
-  import('./pages/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage }))
-);
-const FeedPage = lazy(() => import('./pages/FeedPage').then((m) => ({ default: m.FeedPage })));
-const LegalPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.LegalPage })));
-const ProfilePage = lazy(() =>
-  import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
-);
-const ResetPasswordPage = lazy(() =>
-  import('./pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage }))
-);
+const LoginPage = LazyLoginPage.Component;
+const RegisterPage = LazyRegisterPage.Component;
+const AdminPage = LazyAdminPage.Component;
+const AdminUsersPage = LazyAdminUsersPage.Component;
+const FeedPage = LazyFeedPage.Component;
+const LegalPage = LazyLegalPage.Component;
+const ProfilePage = LazyProfilePage.Component;
+const ResetPasswordPage = LazyResetPasswordPage.Component;
 
 const PAGE_FALLBACK = <div className="min-h-[100svh] bg-[#f6f7f2]" />;
 
@@ -64,80 +73,104 @@ function RequirePasswordReset({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function AppRoutes() {
+function RootLayout() {
   const { pathname } = useLocation();
   const isLanding = pathname === '/';
+  const prevPathnameRef = useRef(pathname);
   // Keep the landing iframe mounted once visited so returning to `/` is instant (no 2s cold reload).
   const [landingVisited, setLandingVisited] = useState(isLanding);
+
   useEffect(() => {
     if (isLanding && !landingVisited) setLandingVisited(true);
   }, [isLanding, landingVisited]);
+
+  // Shift focus to the incoming <main> after SPA navigation so keyboard/AT users track context.
+  useEffect(() => {
+    if (prevPathnameRef.current === pathname) return;
+    prevPathnameRef.current = pathname;
+    if (pathname === '/') return;
+    const raf = requestAnimationFrame(() => {
+      const main = document.querySelector<HTMLElement>('main');
+      if (!main) return;
+      if (!main.hasAttribute('tabindex')) main.setAttribute('tabindex', '-1');
+      main.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pathname]);
+
   const landingMounted = landingVisited || isLanding;
 
   return (
     <>
+      <ScrollRestoration />
       {landingMounted && <LandingPage active={isLanding} />}
       {!isLanding && (
         <Suspense fallback={PAGE_FALLBACK}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route
-              path="/reset-password"
-              element={
-                <RequirePasswordReset>
-                  <ResetPasswordPage />
-                </RequirePasswordReset>
-              }
-            />
-            <Route
-              path="/feed"
-              element={
-                <FeedRoute>
-                  <FeedPage />
-                </FeedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <RequireAuth>
-                  <ProfilePage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <RequireAdmin>
-                  <AdminPage />
-                </RequireAdmin>
-              }
-            />
-            <Route
-              path="/admin/users"
-              element={
-                <RequireAdmin>
-                  <AdminUsersPage />
-                </RequireAdmin>
-              }
-            />
-            <Route path="/privacy" element={<LegalPage kind="privacy" />} />
-            <Route path="/terms" element={<LegalPage kind="terms" />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Outlet />
         </Suspense>
       )}
     </>
   );
 }
 
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: '/', element: null },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      {
+        path: '/reset-password',
+        element: (
+          <RequirePasswordReset>
+            <ResetPasswordPage />
+          </RequirePasswordReset>
+        ),
+      },
+      {
+        path: '/feed',
+        element: (
+          <FeedRoute>
+            <FeedPage />
+          </FeedRoute>
+        ),
+      },
+      {
+        path: '/profile',
+        element: (
+          <RequireAuth>
+            <ProfilePage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: '/admin',
+        element: (
+          <RequireAdmin>
+            <AdminPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/users',
+        element: (
+          <RequireAdmin>
+            <AdminUsersPage />
+          </RequireAdmin>
+        ),
+      },
+      { path: '/privacy', element: <LegalPage kind="privacy" /> },
+      { path: '/terms', element: <LegalPage kind="terms" /> },
+      { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
+]);
+
 export function App() {
   return (
     <LostLinkProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </LostLinkProvider>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, LogOut, Bell, Check, Menu, X } from 'lucide-react';
+import { preloadRoute } from '../lib/routes';
 import { useLostLink } from '../lib/store';
 import { Tooltip } from './InfoTip';
 
@@ -13,6 +14,7 @@ function LostLinkLogo() {
   return (
     <Link
       to="/"
+      viewTransition
       className="inline-flex min-h-[44px] shrink-0 items-center gap-3 text-[24px] font-semibold tracking-[-0.02em] text-[#0a0a0a]"
     >
       <img
@@ -50,6 +52,11 @@ function DlsauSeal({ showName = false }: { showName?: boolean }) {
   );
 }
 
+const desktopNavLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `relative inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors ${
+    isActive ? 'text-[#0a0a0a]' : 'text-[#454545] hover:bg-white hover:text-[#0a0a0a]'
+  }`;
+
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors ${isActive
     ? 'border border-[var(--color-line-strong)] bg-white text-[#0a0a0a]'
@@ -59,7 +66,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export function Header({ variant = 'app', onOpenReport }: HeaderProps) {
   if (variant === 'auth') {
     return (
-      <header className="border-b border-[var(--color-line)] bg-[#f6f7f2]">
+      <header data-site-header="" className="border-b border-[var(--color-line)] bg-[#f6f7f2]">
         <div className="mx-auto flex min-h-[72px] w-full max-w-[1280px] items-center justify-between gap-3 px-6 py-2 sm:px-12 lg:px-20">
           <LostLinkLogo />
           <DlsauSeal showName />
@@ -149,7 +156,7 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
   const handleConfirmSignOut = () => {
     setSignOutOpen(false);
     // Stay on /feed as a guest if signing out from the feed; otherwise go to /login.
-    navigate(pathname === '/feed' ? '/feed' : '/login', { replace: true });
+    navigate(pathname === '/feed' ? '/feed' : '/login', { replace: true, viewTransition: true });
     void signOut();
   };
 
@@ -167,15 +174,33 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
     : [{ to: '/feed', label: 'Campus Feed', end: false }];
 
   return (
-    <header className="sm:sticky sm:top-0 z-20 border-b border-[var(--color-line)] bg-[#f6f7f2]">
+    <header data-site-header="" className="sm:sticky sm:top-0 z-20 border-b border-[var(--color-line)] bg-[#f6f7f2]">
       <div className="mx-auto flex min-h-[72px] w-full max-w-[1280px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-2 sm:flex-nowrap sm:px-12 lg:px-20">
         <div className="flex min-w-0 items-center gap-4">
           <LostLinkLogo />
 
           <nav className="hidden items-center gap-1 lg:flex" aria-label="Portal sections">
             {portalLinks.map((link) => (
-              <NavLink key={link.to} to={link.to} end={link.end} className={navLinkClass}>
-                {link.label}
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end}
+                viewTransition
+                onPointerEnter={() => preloadRoute(link.to)}
+                onFocus={() => preloadRoute(link.to)}
+                className={desktopNavLinkClass}
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span
+                        aria-hidden="true"
+                        className="vt-nav-pill pointer-events-none absolute inset-0 rounded-lg border border-[var(--color-line-strong)] bg-white"
+                      />
+                    )}
+                    <span className="relative z-10">{link.label}</span>
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -220,6 +245,7 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
                 {notifOpen && (
                   <div
                     role="dialog"
+                    data-popover-panel=""
                     aria-label="Account notifications"
                     className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-24px),360px)] overflow-hidden rounded-xl border border-[var(--color-line-strong)] bg-white shadow-[0_18px_40px_-12px_rgba(10,10,10,0.22)]"
                   >
@@ -286,6 +312,8 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
                     <div className="border-t border-[var(--color-line)] bg-[#f6f7f2] px-4 py-1 text-right">
                       <Link
                         to="/profile"
+                        viewTransition
+                        onPointerEnter={() => preloadRoute('/profile')}
                         onClick={() => setNotifOpen(false)}
                         className="inline-flex min-h-[44px] items-center text-xs font-medium text-[#1f6b3a] underline-offset-4 hover:underline"
                       >
@@ -300,7 +328,7 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
                 <button
                   type="button"
                   onClick={onOpenReport}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#1f6b3a] px-3.5 text-sm font-medium text-white transition-colors hover:bg-[#19562e] sm:px-5 sm:text-base cursor-pointer"
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#1f6b3a] px-3.5 text-sm font-medium text-white transition-[background-color,transform] duration-150 hover:bg-[#19562e] active:scale-[0.985] sm:px-5 sm:text-base cursor-pointer"
                 >
                   Post an item +
                 </button>
@@ -328,6 +356,9 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
             <>
               <Link
                 to={`/login?next=${encodeURIComponent(`${pathname}${search}`)}`}
+                viewTransition
+                onPointerEnter={() => preloadRoute('/login')}
+                onFocus={() => preloadRoute('/login')}
                 className="inline-flex min-h-[44px] items-center px-2.5 text-sm font-medium text-[#454545] underline-offset-4 hover:text-[#0a0a0a] hover:underline"
               >
                 Sign in
@@ -336,7 +367,7 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
                 <button
                   type="button"
                   onClick={onOpenReport}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#1f6b3a] px-3.5 text-sm font-medium text-white transition-colors hover:bg-[#19562e] sm:px-5 sm:text-base cursor-pointer"
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#1f6b3a] px-3.5 text-sm font-medium text-white transition-[background-color,transform] duration-150 hover:bg-[#19562e] active:scale-[0.985] sm:px-5 sm:text-base cursor-pointer"
                 >
                   Report an item
                 </button>
@@ -382,6 +413,7 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
       {currentUser && mobileNavOpen && (
         <nav
           id="mobile-portal-nav"
+          data-popover-panel=""
           aria-label="Mobile portal sections"
           className="border-t border-[var(--color-line)] bg-white px-6 py-3 sm:px-12 lg:hidden"
         >
@@ -391,6 +423,8 @@ function AppHeader({ onOpenReport }: { onOpenReport?: () => void }) {
                 key={link.to}
                 to={link.to}
                 end={link.end}
+                viewTransition
+                onPointerEnter={() => preloadRoute(link.to)}
                 onClick={() => setMobileNavOpen(false)}
                 className={navLinkClass}
               >

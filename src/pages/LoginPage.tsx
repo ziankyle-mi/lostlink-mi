@@ -54,10 +54,13 @@ export function LoginPage() {
 
   const finishAuth = (user?: { role: string; mustChangePassword?: boolean }) => {
     if (user?.mustChangePassword) {
-      navigate(`/reset-password${nextQuery}`, { replace: true });
+      navigate(`/reset-password${nextQuery}`, { replace: true, viewTransition: true });
       return;
     }
-    navigate(nextPath ?? (user?.role === 'admin' ? '/admin' : '/feed'), { replace: true });
+    navigate(nextPath ?? (user?.role === 'admin' ? '/admin' : '/feed'), {
+      replace: true,
+      viewTransition: true,
+    });
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -97,6 +100,7 @@ export function LoginPage() {
               <div className="mb-3">
                 <Link
                   to="/"
+                  viewTransition
                   className="-ml-1 inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-1 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
@@ -230,6 +234,7 @@ export function LoginPage() {
               <span>Don't have an account yet?</span>
               <Link
                 to={`/register${nextQuery}`}
+                viewTransition
                 className="inline-flex min-h-[44px] items-center font-medium text-[#1f6b3a] underline underline-offset-4"
               >
                 Register @dlsau.edu.ph

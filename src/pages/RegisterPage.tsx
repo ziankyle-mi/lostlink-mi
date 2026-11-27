@@ -116,7 +116,7 @@ export function RegisterPage() {
       );
       return;
     }
-    navigate(nextPath ?? '/feed', { replace: true });
+    navigate(nextPath ?? '/feed', { replace: true, viewTransition: true });
   };
 
   return (
@@ -132,6 +132,7 @@ export function RegisterPage() {
             <div className="mb-3">
               <Link
                 to="/"
+                viewTransition
                 className="-ml-1 inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-1 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
               >
                 <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
@@ -343,11 +344,11 @@ export function RegisterPage() {
                 />
                 <span>
                   I accept the{' '}
-                  <Link to="/privacy" className="text-[#1f6b3a] underline underline-offset-4">
+                  <Link to="/privacy" viewTransition className="text-[#1f6b3a] underline underline-offset-4">
                     Privacy Policy
                   </Link>{' '}
                   and{' '}
-                  <Link to="/terms" className="text-[#1f6b3a] underline underline-offset-4">
+                  <Link to="/terms" viewTransition className="text-[#1f6b3a] underline underline-offset-4">
                     Terms of Use
                   </Link>
                   .
@@ -386,7 +387,7 @@ export function RegisterPage() {
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-line)] pt-4 text-sm text-[#454545]">
             <span>Already registered?</span>
-            <Link to={`/login${nextQuery}`} className="inline-flex min-h-[44px] items-center font-medium text-[#1f6b3a] underline underline-offset-4">
+            <Link to={`/login${nextQuery}`} viewTransition className="inline-flex min-h-[44px] items-center font-medium text-[#1f6b3a] underline underline-offset-4">
               Sign in to LostLink
             </Link>
           </div>

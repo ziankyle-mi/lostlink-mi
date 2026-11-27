@@ -54,12 +54,15 @@ export function ResetPasswordPage() {
       setError(res.error ?? 'Could not update password.');
       return;
     }
-    navigate(nextPath ?? (currentUser?.role === 'admin' ? '/admin' : '/feed'), { replace: true });
+    navigate(nextPath ?? (currentUser?.role === 'admin' ? '/admin' : '/feed'), {
+      replace: true,
+      viewTransition: true,
+    });
   };
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login', { replace: true });
+    navigate('/login', { replace: true, viewTransition: true });
   };
 
   return (
