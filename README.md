@@ -3,7 +3,11 @@
 This system acts as the official De La Salle Araneta University (DLSAU) Lost & Found portal.
 
 ## Tech Stack
-- React (with TypeScript & Vite)
+- React 
 - Tailwind CSS
-- Supabase (Auth, Storage, Realtime, Edge Functions)
+- Supabase 
 - PostgreSQL
+
+## Members
+- Manuel Zian Kyle Piangco
+- Joshua Enriquez
