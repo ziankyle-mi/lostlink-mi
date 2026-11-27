@@ -1,87 +1,18 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
-import { Tooltip } from '../components/InfoTip';
-import { useFieldValidation, ValidationBubble } from '../components/ValidationBubble';
+import { PasswordField } from '../components/PasswordField';
+import { useFieldValidation } from '../components/ValidationBubble';
 import { useLostLink } from '../lib/store';
-
-interface PasswordFieldProps {
-  id: string;
-  name: string;
-  label: string;
-  value: string;
-  placeholder: string;
-  visible: boolean;
-  toggleLabel: string;
-  errorId: string;
-  error?: string;
-  ariaProps: { 'aria-invalid': boolean; 'aria-describedby'?: string };
-  onChange: (value: string) => void;
-  onBlur: () => void;
-  onToggleVisible: () => void;
-}
-
-function PasswordField({
-  id,
-  name,
-  label,
-  value,
-  placeholder,
-  visible,
-  toggleLabel,
-  errorId,
-  error,
-  ariaProps,
-  onChange,
-  onBlur,
-  onToggleVisible,
-}: PasswordFieldProps) {
-  return (
-    <div className="grid gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      <div className="relative flex items-center">
-        <input
-          id={id}
-          name={name}
-          type={visible ? 'text' : 'password'}
-          autoComplete="new-password"
-          required
-          minLength={8}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onBlur}
-          {...ariaProps}
-          placeholder={placeholder}
-          className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white pl-3 pr-12 text-base"
-        />
-        <Tooltip text={visible ? 'Hide password' : 'Show password'} className="absolute right-0.5">
-          <button
-            type="button"
-            onClick={onToggleVisible}
-            aria-label={visible ? `Hide ${toggleLabel}` : `Show ${toggleLabel}`}
-            aria-pressed={visible}
-            className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
-          >
-            {visible ? (
-              <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
-            ) : (
-              <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
-            )}
-          </button>
-        </Tooltip>
-      </div>
-      <ValidationBubble id={errorId} message={error} />
-    </div>
-  );
-}
+import { sanitizeNextPath } from '../lib/validation';
 
 export function ResetPasswordPage() {
   const { currentUser, completePasswordReset, signOut } = useLostLink();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = sanitizeNextPath(searchParams.get('next'));
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -123,7 +54,7 @@ export function ResetPasswordPage() {
       setError(res.error ?? 'Could not update password.');
       return;
     }
-    navigate(currentUser?.role === 'admin' ? '/admin' : '/feed', { replace: true });
+    navigate(nextPath ?? (currentUser?.role === 'admin' ? '/admin' : '/feed'), { replace: true });
   };
 
   const handleSignOut = async () => {
@@ -158,6 +89,8 @@ export function ResetPasswordPage() {
               label="New password"
               value={password}
               placeholder="At least 8 characters"
+              autoComplete="new-password"
+              minLength={8}
               visible={showPassword}
               toggleLabel="new password"
               errorId="reset-password-err"
@@ -181,6 +114,8 @@ export function ResetPasswordPage() {
               label="Confirm new password"
               value={confirm}
               placeholder="Re-enter your new password"
+              autoComplete="new-password"
+              minLength={8}
               visible={showConfirm}
               toggleLabel="confirm password"
               errorId="reset-confirm-err"

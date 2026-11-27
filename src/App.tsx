@@ -2,9 +2,11 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { LostLinkProvider, useLostLink } from './lib/store';
 import { LandingPage } from './pages/LandingPage';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
 
+const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() =>
+  import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage }))
+);
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 const AdminUsersPage = lazy(() =>
   import('./pages/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage }))
@@ -22,18 +24,33 @@ const PAGE_FALLBACK = <div className="min-h-[100svh] bg-[#f6f7f2]" />;
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { currentUser, authReady } = useLostLink();
+  const { pathname, search } = useLocation();
   if (!authReady) return PAGE_FALLBACK;
-  if (!currentUser) return <Navigate to="/login" replace />;
+  if (!currentUser) {
+    const next = encodeURIComponent(`${pathname}${search}`);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
   if (currentUser.mustChangePassword) return <Navigate to="/reset-password" replace />;
   return <>{children}</>;
 }
 
 function RequireAdmin({ children }: { children: ReactNode }) {
   const { currentUser, authReady } = useLostLink();
+  const { pathname, search } = useLocation();
   if (!authReady) return PAGE_FALLBACK;
-  if (!currentUser) return <Navigate to="/login" replace />;
+  if (!currentUser) {
+    const next = encodeURIComponent(`${pathname}${search}`);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
   if (currentUser.mustChangePassword) return <Navigate to="/reset-password" replace />;
   if (currentUser.role !== 'admin') return <Navigate to="/feed" replace />;
+  return <>{children}</>;
+}
+
+function FeedRoute({ children }: { children: ReactNode }) {
+  const { currentUser, authReady } = useLostLink();
+  if (!authReady) return PAGE_FALLBACK;
+  if (currentUser?.mustChangePassword) return <Navigate to="/reset-password" replace />;
   return <>{children}</>;
 }
 
@@ -76,9 +93,9 @@ function AppRoutes() {
             <Route
               path="/feed"
               element={
-                <RequireAuth>
+                <FeedRoute>
                   <FeedPage />
-                </RequireAuth>
+                </FeedRoute>
               }
             />
             <Route

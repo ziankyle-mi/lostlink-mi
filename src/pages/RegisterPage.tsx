@@ -1,20 +1,26 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
-import { Toggletip, Tooltip } from '../components/InfoTip';
+import { Toggletip } from '../components/InfoTip';
+import { PasswordField } from '../components/PasswordField';
 import { useFieldValidation, ValidationBubble } from '../components/ValidationBubble';
 import { PROGRAMS_BY_COLLEGE, useLostLink } from '../lib/store';
-import { isDlsauEmail, isStudentId } from '../lib/validation';
+import { describeNextIntent, isDlsauEmail, isStudentId, sanitizeNextPath } from '../lib/validation';
 import type { AccountType } from '../types';
 
 const COLLEGE_PROGRAM_GROUPS = Object.entries(PROGRAMS_BY_COLLEGE);
 const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', '6th Year'] as const;
 
 export function RegisterPage() {
-  const { registerAccount } = useLostLink();
+  const { currentUser, authReady, registerAccount } = useLostLink();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const nextPath = sanitizeNextPath(searchParams.get('next'));
+  const nextQuery = nextPath ? `?next=${encodeURIComponent(nextPath)}` : '';
+  const intentLabel = describeNextIntent(nextPath);
 
   const [accountType, setAccountType] = useState<AccountType>('student');
   const [fullName, setFullName] = useState('');
@@ -57,6 +63,15 @@ export function RegisterPage() {
     [accountType]
   );
   const validation = useFieldValidation(validators);
+
+  if (authReady && currentUser) {
+    return (
+      <Navigate
+        to={nextPath ?? (currentUser.role === 'admin' ? '/admin' : '/feed')}
+        replace
+      />
+    );
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -101,7 +116,7 @@ export function RegisterPage() {
       );
       return;
     }
-    navigate('/feed');
+    navigate(nextPath ?? '/feed', { replace: true });
   };
 
   return (
@@ -121,6 +136,11 @@ export function RegisterPage() {
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
               Back to LostLink
             </Link>
+            {intentLabel && (
+              <p className="mb-3 inline-flex items-center rounded-md border border-[#c2dec9] bg-[#e7f3ea] px-2.5 py-1 font-mono text-xs font-medium text-[#15522b]">
+                Next: {intentLabel}
+              </p>
+            )}
             <h1 id="reg-heading" className="text-[26px] font-semibold leading-tight tracking-[-0.025em]">
               Create your DLSAU account
             </h1>
@@ -282,49 +302,26 @@ export function RegisterPage() {
               </>
             )}
 
-            <div className="grid gap-1.5 sm:col-span-2">
-              <label htmlFor="reg-pass" className="text-sm font-medium">
-                Password
-              </label>
-              <div className="relative flex items-center">
-                <input
-                  id="reg-pass"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    validation.handleChange('password', e.target.value);
-                  }}
-                  onBlur={() => validation.handleBlur('password', password)}
-                  {...validation.ariaFor('password', 'reg-pass-err')}
-                  placeholder="Minimum 8 characters"
-                  className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white pl-3 pr-12 text-base"
-                />
-                <Tooltip
-                  text={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-0.5"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    aria-pressed={showPassword}
-                    className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
-                    ) : (
-                      <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
-                    )}
-                  </button>
-                </Tooltip>
-              </div>
-              <ValidationBubble id="reg-pass-err" message={validation.errors.password} />
-            </div>
+            <PasswordField
+              id="reg-pass"
+              name="password"
+              label="Password"
+              value={password}
+              placeholder="Minimum 8 characters"
+              autoComplete="new-password"
+              minLength={8}
+              visible={showPassword}
+              errorId="reg-pass-err"
+              error={validation.errors.password}
+              className="sm:col-span-2"
+              ariaProps={validation.ariaFor('password', 'reg-pass-err')}
+              onChange={(next) => {
+                setPassword(next);
+                validation.handleChange('password', next);
+              }}
+              onBlur={() => validation.handleBlur('password', password)}
+              onToggleVisible={() => setShowPassword((v) => !v)}
+            />
 
             <div className="grid gap-1 sm:col-span-2">
               <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-[#454545]">
@@ -384,7 +381,7 @@ export function RegisterPage() {
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-line)] pt-4 text-sm text-[#454545]">
             <span>Already registered?</span>
-            <Link to="/login" className="inline-flex min-h-[44px] items-center font-medium text-[#1f6b3a] underline underline-offset-4">
+            <Link to={`/login${nextQuery}`} className="inline-flex min-h-[44px] items-center font-medium text-[#1f6b3a] underline underline-offset-4">
               Sign in to LostLink
             </Link>
           </div>

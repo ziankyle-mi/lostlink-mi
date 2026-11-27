@@ -401,8 +401,8 @@
             <div class="wrap grid">
               <div class="menu-col span-3">
                 <p class="t-label">Campus Feed</p>
-                <a href="/login" target="_top">Found items<span>Held at LSB Room 102</span></a>
-                <a href="/login" target="_top">Lost reports<span>Posted by DLSAU owners</span></a>
+                <a href="/feed?type=found" target="_top">Found items<span>Held at LSB Room 102</span></a>
+                <a href="/feed?type=lost" target="_top">Lost reports<span>Posted by DLSAU owners</span></a>
               </div>
               <div class="menu-col span-3">
                 <p class="t-label">Verification</p>
@@ -417,8 +417,8 @@
         <div class="nav__item"><a class="nav__link" href="#faq">Questions</a></div>
       </nav>
       <div class="nav__actions">
-        <a class="nav__link" href="/login" target="_top">Sign in</a>
-        <a class="btn btn--primary" href="/login" target="_top">Report an item</a>
+        <a class="nav__link" id="nav-auth-link" href="/login" target="_top">Sign in</a>
+        <a class="btn btn--primary" href="/feed?report=found" target="_top">Report an item</a>
         <a class="nav__dlsau" href="https://www.dlsau.edu.ph/" target="_blank" rel="noopener noreferrer"
           aria-label="De La Salle Araneta University"><span class="nav__dlsau-name">De La Salle Araneta University</span><img
             src="/assets/img/dlsau-logo.svg" alt="" width="42" height="42"></a>
@@ -442,12 +442,12 @@
             <p class="hero__lead">Students and staff report lost or found property, track custody by LL reference tag,
               and verify claims at Life Science Building Room 102.</p>
             <div class="btn-row">
-              <a class="btn btn--primary" href="/login" target="_top">Report an item<svg class="m-arrow" viewBox="0 0 12 12"
+              <a class="btn btn--primary" href="/feed" target="_top">Browse campus feed<svg class="m-arrow" viewBox="0 0 12 12"
                   aria-hidden="true">
                   <path class="m-arrow__stem" d="M1 6h8" />
                   <path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5" />
                 </svg></a>
-              <a class="btn btn--secondary" href="/login" target="_top">Browse campus feed</a>
+              <a class="btn btn--secondary" href="/feed?report=found" target="_top">Report an item</a>
             </div>
           </div>
           <div class="hero__window" data-fx="fluted-glass" data-fx-seed="7" role="img"
@@ -853,7 +853,7 @@
           <h2 id="close-h">Report an item</h2>
           <p>Log a lost sighting or found custody item with your @dlsau.edu.ph account.</p>
         </div>
-        <a class="btn btn--primary btn--xl" href="/login" target="_top">Report an item<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
+        <a class="btn btn--primary btn--xl" href="/feed?report=found" target="_top">Report an item<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
       </div>
       <div class="closing__links">
         <div class="grid">
@@ -865,8 +865,8 @@
           <div class="span-2 footer__col">
             <h3>Feed</h3>
             <ul>
-              <li><a href="/login" target="_top">Found items</a></li>
-              <li><a href="/login" target="_top">Lost reports</a></li>
+              <li><a href="/feed?type=found" target="_top">Found items</a></li>
+              <li><a href="/feed?type=lost" target="_top">Lost reports</a></li>
             </ul>
           </div>
           <div class="span-2 footer__col">
@@ -928,6 +928,20 @@
 
         // Route internal target="_top" links through the parent React Router for instant SPA transitions.
         if (window.parent !== window && window.location.origin !== 'null') {
+          const authLink = document.getElementById('nav-auth-link');
+          window.addEventListener('message', (e) => {
+            if (e.origin !== window.location.origin || e.source !== window.parent) return;
+            if (e.data?.type !== 'lostlink:auth' || !authLink) return;
+            if (e.data.signedIn) {
+              authLink.textContent = e.data.portalLabel || 'Open portal';
+              authLink.setAttribute('href', e.data.portalPath || '/feed');
+            } else {
+              authLink.textContent = 'Sign in';
+              authLink.setAttribute('href', '/login');
+            }
+          });
+          window.parent.postMessage({ type: 'lostlink:ready' }, window.location.origin);
+
           document.addEventListener('click', (e) => {
             if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
             const link = e.target instanceof Element ? e.target.closest('a[target="_top"][href^="/"]') : null;

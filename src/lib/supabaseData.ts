@@ -259,3 +259,37 @@ export async function fetchPortalSnapshot(client: SupabaseClient, user: Profile)
     adminLog: isAdmin ? ((logRes.data ?? []) as AdminLogRow[]).map(mapAdminLog) : [],
   };
 }
+
+/** Read-only snapshot for unauthenticated campus visitors (approved items & active notices only). */
+export async function fetchPublicSnapshot(client: SupabaseClient) {
+  const [itemsRes, bcRes] = await Promise.all([
+    client
+      .from('items')
+      .select(
+        'id, reference_code, type, status, name, category, location, event_date, description, images, hide_photo, custody_note, custody_extended_until, donation_turnover, created_at'
+      )
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    client
+      .from('broadcasts')
+      .select('id, tier, message, active, created_at')
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ]);
+
+  const rawItems = ((itemsRes.data ?? []) as Partial<ItemRow>[]).map((r) =>
+    mapItem({
+      ...(r as ItemRow),
+      reject_reason: null,
+      reporter_id: '',
+    })
+  );
+  const items = await signItemImages(client, rawItems, false);
+
+  return {
+    items,
+    broadcasts: ((bcRes.data ?? []) as BroadcastRow[]).map(mapBroadcast),
+  };
+}

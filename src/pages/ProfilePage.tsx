@@ -4,6 +4,7 @@ import { ClipboardList, PackageCheck, ShieldCheck } from 'lucide-react';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
 import { PhotoSlider } from '../components/PhotoSlider';
+import { initialsOf } from '../lib/constants';
 import { useLostLink } from '../lib/store';
 import type { Claim, Item } from '../types';
 
@@ -168,17 +169,7 @@ export function ProfilePage() {
     selectedItem?.status === 'pending' &&
     selectedItem.reporterId === currentUser?.id;
 
-  const initials = useMemo(
-    () =>
-      (currentUser?.fullName ?? 'DL')
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0]?.toUpperCase() ?? '')
-        .join(''),
-    [currentUser?.fullName]
-  );
+  const initials = useMemo(() => initialsOf(currentUser?.fullName ?? ''), [currentUser?.fullName]);
 
   const summaryStats = [
     { label: 'Items reported', value: totalReports, Icon: ClipboardList, accent: false },

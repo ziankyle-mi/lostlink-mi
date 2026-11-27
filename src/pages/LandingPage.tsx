@@ -1,14 +1,34 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLostLink } from '../lib/store';
 
 interface LandingPageProps {
   active?: boolean;
 }
 
 export function LandingPage({ active = true }: LandingPageProps) {
+  const { currentUser } = useLostLink();
   const navigate = useNavigate();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wasActiveRef = useRef(active);
+
+  const syncAuthToIframe = useCallback(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(
+      {
+        type: 'lostlink:auth',
+        signedIn: Boolean(currentUser),
+        portalPath: currentUser?.role === 'admin' ? '/admin' : '/feed',
+        portalLabel: currentUser?.role === 'admin' ? 'DO Console' : 'Open portal',
+      },
+      window.location.origin
+    );
+  }, [currentUser]);
+
+  useEffect(() => {
+    syncAuthToIframe();
+  }, [syncAuthToIframe]);
 
   // Intercept same-origin link clicks from the static landing iframe so they use
   // React Router instead of triggering a full target="_top" page reload.
@@ -17,6 +37,10 @@ export function LandingPage({ active = true }: LandingPageProps) {
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
       if (e.source !== iframeRef.current?.contentWindow) return;
+      if (e.data?.type === 'lostlink:ready') {
+        syncAuthToIframe();
+        return;
+      }
       if (e.data?.type !== 'lostlink:navigate') return;
       const to = e.data.to;
       if (typeof to !== 'string' || !to.startsWith('/') || to.startsWith('//')) return;
@@ -24,7 +48,7 @@ export function LandingPage({ active = true }: LandingPageProps) {
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [active, navigate]);
+  }, [active, navigate, syncAuthToIframe]);
 
   // Reset scroll to top when returning to the kept-alive landing iframe.
   useEffect(() => {
@@ -43,6 +67,7 @@ export function LandingPage({ active = true }: LandingPageProps) {
     <iframe
       ref={iframeRef}
       src="/landing/index.html"
+      onLoad={syncAuthToIframe}
       title="LostLink · Campus lost and found for DLSAU"
       hidden={!active}
       aria-hidden={!active}

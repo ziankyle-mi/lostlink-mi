@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
-import { Tooltip } from '../components/InfoTip';
+import { PasswordField } from '../components/PasswordField';
 import { useFieldValidation, ValidationBubble } from '../components/ValidationBubble';
 import { useLostLink } from '../lib/store';
-import { isDlsauEmail } from '../lib/validation';
+import { describeNextIntent, isDlsauEmail, sanitizeNextPath } from '../lib/validation';
 
 const LOGIN_VALIDATORS = {
   email: (v: string) => {
@@ -23,8 +23,13 @@ const LOGIN_VALIDATORS = {
 };
 
 export function LoginPage() {
-  const { signIn, signInDemoRole, isLiveBackend } = useLostLink();
+  const { currentUser, authReady, signIn, signInDemoRole, isLiveBackend } = useLostLink();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const nextPath = sanitizeNextPath(searchParams.get('next'));
+  const nextQuery = nextPath ? `?next=${encodeURIComponent(nextPath)}` : '';
+  const intentLabel = describeNextIntent(nextPath);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,6 +39,26 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   const validation = useFieldValidation(LOGIN_VALIDATORS);
+
+  if (authReady && currentUser) {
+    if (currentUser.mustChangePassword) {
+      return <Navigate to={`/reset-password${nextQuery}`} replace />;
+    }
+    return (
+      <Navigate
+        to={nextPath ?? (currentUser.role === 'admin' ? '/admin' : '/feed')}
+        replace
+      />
+    );
+  }
+
+  const finishAuth = (user?: { role: string; mustChangePassword?: boolean }) => {
+    if (user?.mustChangePassword) {
+      navigate(`/reset-password${nextQuery}`, { replace: true });
+      return;
+    }
+    navigate(nextPath ?? (user?.role === 'admin' ? '/admin' : '/feed'), { replace: true });
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,20 +76,11 @@ export function LoginPage() {
       setError(res.error ?? 'Could not sign in.');
       return;
     }
-    if (res.user?.mustChangePassword) {
-      navigate('/reset-password');
-      return;
-    }
-    navigate(res.user?.role === 'admin' ? '/admin' : '/feed');
+    finishAuth(res.user);
   };
 
   const handleQuickDemo = (role: 'student' | 'admin') => {
-    const user = signInDemoRole(role);
-    if (user.mustChangePassword) {
-      navigate('/reset-password');
-      return;
-    }
-    navigate(role === 'admin' ? '/admin' : '/feed');
+    finishAuth(signInDemoRole(role));
   };
 
   return (
@@ -85,6 +101,11 @@ export function LoginPage() {
                 <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                 Back to LostLink
               </Link>
+              {intentLabel && (
+                <p className="mb-3 inline-flex items-center rounded-md border border-[#c2dec9] bg-[#e7f3ea] px-2.5 py-1 font-mono text-xs font-medium text-[#15522b]">
+                  Next: {intentLabel}
+                </p>
+              )}
               <h1 id="login-heading" className="text-[26px] font-semibold leading-tight tracking-[-0.025em]">
                 Campus portal sign in
               </h1>
@@ -121,56 +142,28 @@ export function LoginPage() {
                 <ValidationBubble id="login-email-err" message={validation.errors.email} />
               </div>
 
-              <div className="grid gap-1.5">
-                <label htmlFor="login-password" className="text-sm font-medium">
-                  Password
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    id="login-password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (error) setError(null);
-                      validation.handleChange('password', e.target.value);
-                    }}
-                    onBlur={() => validation.handleBlur('password', password)}
-                    {...validation.ariaFor('password', 'login-password-err')}
-                    placeholder="Enter your password"
-                    className="h-[46px] w-full rounded-lg border border-[var(--color-line-strong)] bg-white pl-3 pr-12 text-base"
-                  />
-                  <Tooltip
-                    text={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-0.5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      aria-pressed={showPassword}
-                      className="grid h-[44px] w-[44px] place-items-center rounded-lg text-[#454545] hover:text-[#0a0a0a] cursor-pointer"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
-                      ) : (
-                        <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
-                      )}
-                    </button>
-                  </Tooltip>
-                </div>
-                <ValidationBubble id="login-password-err" message={validation.errors.password} />
-              </div>
+              <PasswordField
+                id="login-password"
+                name="password"
+                label="Password"
+                value={password}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                minLength={6}
+                visible={showPassword}
+                errorId="login-password-err"
+                error={validation.errors.password}
+                ariaProps={validation.ariaFor('password', 'login-password-err')}
+                onChange={(next) => {
+                  setPassword(next);
+                  if (error) setError(null);
+                  validation.handleChange('password', next);
+                }}
+                onBlur={() => validation.handleBlur('password', password)}
+                onToggleVisible={() => setShowPassword((v) => !v)}
+              />
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-[#454545]">
-                  <input type="checkbox" className="h-4 w-4 rounded" />
-                  <span>Remember this browser</span>
-                </label>
+              <div className="flex items-center justify-end">
                 <button
                   type="button"
                   onClick={() => setShowResetNote((v) => !v)}
@@ -231,7 +224,7 @@ export function LoginPage() {
             <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-line)] pt-4 text-sm text-[#454545]">
               <span>Don't have an account yet?</span>
               <Link
-                to="/register"
+                to={`/register${nextQuery}`}
                 className="inline-flex min-h-[44px] items-center font-medium text-[#1f6b3a] underline underline-offset-4"
               >
                 Register @dlsau.edu.ph

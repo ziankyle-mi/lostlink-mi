@@ -19,7 +19,7 @@ Living reference of implemented roles, workflows, and security boundaries in the
 
 - **Feeds**: Approved **Found** items held at Life Science Building Room 102 and **Lost** alerts reported by owners.
 - **Filtering**: Search (item name, description, `LL-XXXXX` code), category, 17 campus buildings, and type tabs.
-- **Inspect Modal (`ItemDialogs.tsx`)**: Multi-photo slider, building/category/date metadata, one-click reference code copy, and contextual form:
+- **Inspect Modal (`InspectDialog.tsx`)**: Multi-photo slider, building/category/date metadata, one-click reference code copy, and contextual form:
   - **Found items** → Private **Ownership Proof** claim (`>= 20` characters, visible only to claimant and DO admins).
   - **Lost items** → **Sighting / Turn-in Note** (`>= 20` characters) recorded in `public.sightings` and delivered as notifications to the owner and sender (no fake claim created).
 

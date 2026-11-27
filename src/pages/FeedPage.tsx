@@ -1,21 +1,32 @@
-import { useCallback, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
-import { InspectDialog, ReportDialog } from '../components/ItemDialogs';
+import { InspectDialog } from '../components/InspectDialog';
 import { PhotoSlider } from '../components/PhotoSlider';
 import { StatusPill } from '../components/StatusPill';
-import { CAMPUS_BUILDINGS, ITEM_CATEGORIES, useLostLink } from '../lib/store';
+import { CAMPUS_BUILDINGS, HOTSPOT_BUILDINGS, ITEM_CATEGORIES, useLostLink } from '../lib/store';
 import type { ItemType } from '../types';
+
+const ReportDialog = lazy(() =>
+  import('../components/ReportDialog').then((m) => ({ default: m.ReportDialog }))
+);
 
 type FeedFilter = 'all' | 'found' | 'lost' | 'shield';
 
-const HOTSPOTS = ['Library 2F', 'Gate 2', 'DVM Building', '2nd Cafeteria'] as const;
+function parseFeedFilter(raw: string | null): FeedFilter {
+  return raw === 'found' || raw === 'lost' || raw === 'shield' ? raw : 'all';
+}
 
 export function FeedPage() {
-  const { currentUser, items, broadcasts } = useLostLink();
+  const { currentUser, authReady, items, broadcasts } = useLostLink();
   const isAdmin = currentUser?.role === 'admin';
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [typeFilter, setTypeFilter] = useState<FeedFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<FeedFilter>(() =>
+    parseFeedFilter(searchParams.get('type'))
+  );
   const [search, setSearch] = useState('');
   const [building, setBuilding] = useState('all');
   const [category, setCategory] = useState('all');
@@ -23,6 +34,48 @@ export function FeedPage() {
   const [inspectedItemId, setInspectedItemId] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportDefaultType, setReportDefaultType] = useState<ItemType>('found');
+
+  // Apply deep-linked ?type=, ?report=, and ?inspect= intents from landing page or post-login redirects.
+  const urlType = searchParams.get('type');
+  const urlReport = searchParams.get('report');
+  const urlInspect = searchParams.get('inspect');
+
+  useEffect(() => {
+    if (urlType) setTypeFilter(parseFeedFilter(urlType));
+  }, [urlType]);
+
+  useEffect(() => {
+    if (!urlReport || !authReady) return;
+    const kind: ItemType = urlReport === 'lost' ? 'lost' : 'found';
+    if (!currentUser) {
+      navigate(`/login?next=${encodeURIComponent(`/feed?report=${kind}`)}`, { replace: true });
+      return;
+    }
+    setReportDefaultType(kind);
+    setReportOpen(true);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('report');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [urlReport, authReady, currentUser, navigate, setSearchParams]);
+
+  useEffect(() => {
+    if (!urlInspect) return;
+    if (!items.some((i) => i.id === urlInspect)) return;
+    setInspectedItemId(urlInspect);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('inspect');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [urlInspect, items, setSearchParams]);
 
   const approvedItems = useMemo(
     () => items.filter((item) => item.status === 'approved'),
@@ -63,10 +116,17 @@ export function FeedPage() {
     [broadcasts]
   );
 
-  const openReport = useCallback((kind: ItemType) => {
-    setReportDefaultType(kind);
-    setReportOpen(true);
-  }, []);
+  const openReport = useCallback(
+    (kind: ItemType) => {
+      if (!currentUser) {
+        navigate(`/login?next=${encodeURIComponent(`/feed?report=${kind}`)}`);
+        return;
+      }
+      setReportDefaultType(kind);
+      setReportOpen(true);
+    },
+    [currentUser, navigate]
+  );
 
   const openFoundReport = useCallback(() => openReport('found'), [openReport]);
 
@@ -156,7 +216,7 @@ export function FeedPage() {
                     onClick={() => setInspectedItemId(spotlightItem.id)}
                     className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-[var(--color-line-strong)] bg-white px-4 text-sm font-medium hover:bg-[#f6f7f2] cursor-pointer"
                   >
-                    Inspect &amp; submit claim
+                    {currentUser ? 'Inspect & submit claim' : 'Inspect item details'}
                   </button>
                 </div>
               </article>
@@ -172,7 +232,7 @@ export function FeedPage() {
               <div>
                 <span className="font-mono text-xs text-[#daef8a]">Filter by active building</span>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {HOTSPOTS.map((spot) => {
+                  {HOTSPOT_BUILDINGS.map((spot) => {
                     const active = building === spot;
                     return (
                       <button
@@ -290,21 +350,35 @@ export function FeedPage() {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-xl font-semibold">Campus gallery</h2>
             <span className="font-mono text-xs text-[#454545]">
-              Showing {visibleItems.length} items · Click any photo to claim
+              Showing {visibleItems.length} {visibleItems.length === 1 ? 'item' : 'items'} · Click any photo to inspect
             </span>
           </div>
 
           {/* Open 4:3 Photo Gallery */}
           {visibleItems.length === 0 ? (
             <div className="grid justify-items-center gap-3 rounded-xl border border-[var(--color-line-strong)] bg-white p-10 text-center">
-              <p className="text-[#454545]">No campus items match your active search or building filters.</p>
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--color-line-strong)] px-4 text-sm font-medium hover:bg-[#f6f7f2] cursor-pointer"
-              >
-                Reset all filters
-              </button>
+              <p className="text-[#454545]">
+                {approvedItems.length === 0
+                  ? 'No approved campus listings yet. Found something on campus or lost an item?'
+                  : 'No campus items match your active search or building filters.'}
+              </p>
+              {approvedItems.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => openReport('found')}
+                  className="inline-flex min-h-[44px] items-center rounded-lg bg-[#1f6b3a] px-4 text-sm font-medium text-white hover:bg-[#19562e] cursor-pointer"
+                >
+                  Report an item
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--color-line-strong)] px-4 text-sm font-medium hover:bg-[#f6f7f2] cursor-pointer"
+                >
+                  Reset all filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -359,12 +433,16 @@ export function FeedPage() {
       </main>
 
       <InspectDialog item={inspectedItem} onClose={() => setInspectedItemId(null)} />
-      <ReportDialog
-        open={reportOpen}
-        defaultType={reportDefaultType}
-        onClose={() => setReportOpen(false)}
-        onCreated={resetFilters}
-      />
+      {currentUser && (
+        <Suspense fallback={null}>
+          <ReportDialog
+            open={reportOpen}
+            defaultType={reportDefaultType}
+            onClose={() => setReportOpen(false)}
+            onCreated={resetFilters}
+          />
+        </Suspense>
+      )}
       <Footer />
     </div>
   );

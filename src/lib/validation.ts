@@ -24,6 +24,33 @@ export function isStudentId(value: string): boolean {
   return STUDENT_ID_RE.test(value.trim());
 }
 
+/** Accept only relative in-app paths for ?next= redirects (blocks open redirects & auth loops). */
+export function sanitizeNextPath(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) return null;
+  const base = trimmed.split(/[?#]/)[0];
+  if (base === '/login' || base === '/register' || base === '/reset-password') return null;
+  return trimmed;
+}
+
+/** Plain-language summary of what the user is signing in to finish. */
+export function describeNextIntent(nextPath: string | null): string | null {
+  if (!nextPath) return null;
+  const [path, query = ''] = nextPath.split('?');
+  const params = new URLSearchParams(query);
+  if (path === '/feed') {
+    const report = params.get('report');
+    if (report === 'found') return 'Report a found item';
+    if (report === 'lost') return 'Report a lost item';
+    if (params.get('inspect')) return 'Submit ownership proof or sighting';
+    return 'Return to campus feed';
+  }
+  if (path === '/profile') return 'View your activity';
+  if (path === '/admin' || path === '/admin/users') return 'Open DO Console';
+  return null;
+}
+
 /** Verify image type via magic bytes + 5 MB cap (never trust file extension alone). */
 export async function validateImageFile(file: File): Promise<string | null> {
   if (!ALLOWED_MIME.has(file.type)) {

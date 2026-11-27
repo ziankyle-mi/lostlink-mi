@@ -16,6 +16,7 @@ import { supabase } from './supabase';
 import {
   ITEM_PHOTOS_BUCKET,
   fetchPortalSnapshot,
+  fetchPublicSnapshot,
   mapAdminLog,
   mapBroadcast,
   mapClaim,
@@ -34,14 +35,14 @@ import {
 import {
   CAMPUS_BUILDINGS,
   EMPTY_STATE,
-  INITIAL_DEMO_STATE,
+  HOTSPOT_BUILDINGS,
   ITEM_CATEGORIES,
   PROGRAMS_BY_COLLEGE,
   type PersistedState,
-} from './seedData';
+} from './constants';
 import { generateTempPassword, isDlsauEmail, isStudentId } from './validation';
 
-export { CAMPUS_BUILDINGS, ITEM_CATEGORIES, PROGRAMS_BY_COLLEGE };
+export { CAMPUS_BUILDINGS, HOTSPOT_BUILDINGS, ITEM_CATEGORIES, PROGRAMS_BY_COLLEGE };
 
 const STORAGE_KEY = 'lostlink_dlsau_v1';
 const EMPTY_IMAGES: string[] = [];
@@ -99,34 +100,27 @@ function withDemoMeta(
   };
 }
 
-function runLiveTask(task: () => Promise<void>) {
-  void task().catch((err) => {
-    console.error('[LostLink] Live sync error:', err);
-  });
-}
-
-function loadInitial(): PersistedState {
-  if (supabase) return EMPTY_STATE;
+function loadDemoState(fallback: PersistedState): PersistedState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return INITIAL_DEMO_STATE;
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
       currentUserId: typeof parsed.currentUserId === 'string' ? parsed.currentUserId : null,
       profiles:
         Array.isArray(parsed.profiles) && parsed.profiles.length > 0
           ? parsed.profiles
-          : INITIAL_DEMO_STATE.profiles,
-      items: Array.isArray(parsed.items) ? parsed.items : INITIAL_DEMO_STATE.items,
-      claims: Array.isArray(parsed.claims) ? parsed.claims : INITIAL_DEMO_STATE.claims,
+          : fallback.profiles,
+      items: Array.isArray(parsed.items) ? parsed.items : fallback.items,
+      claims: Array.isArray(parsed.claims) ? parsed.claims : fallback.claims,
       notifications: Array.isArray(parsed.notifications)
         ? parsed.notifications
-        : INITIAL_DEMO_STATE.notifications,
-      broadcasts: Array.isArray(parsed.broadcasts) ? parsed.broadcasts : INITIAL_DEMO_STATE.broadcasts,
-      adminLog: Array.isArray(parsed.adminLog) ? parsed.adminLog : INITIAL_DEMO_STATE.adminLog,
+        : fallback.notifications,
+      broadcasts: Array.isArray(parsed.broadcasts) ? parsed.broadcasts : fallback.broadcasts,
+      adminLog: Array.isArray(parsed.adminLog) ? parsed.adminLog : fallback.adminLog,
     };
   } catch {
-    return INITIAL_DEMO_STATE;
+    return fallback;
   }
 }
 
@@ -154,8 +148,10 @@ interface LostLinkContextValue extends PersistedState {
   currentUser: Profile | null;
   authReady: boolean;
   isLiveBackend: boolean;
+  syncError: string | null;
+  clearSyncError: () => void;
   signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string; user?: Profile }>;
-  signInDemoRole: (role: 'student' | 'admin') => Profile;
+  signInDemoRole: (role: 'student' | 'admin') => Profile | undefined;
   registerAccount: (
     input: RegisterInput
   ) => Promise<{ ok: boolean; error?: string; needsEmailConfirm?: boolean }>;
@@ -187,9 +183,19 @@ interface LostLinkContextValue extends PersistedState {
 const LostLinkContext = createContext<LostLinkContextValue | null>(null);
 
 export function LostLinkProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PersistedState>(loadInitial);
-  const [authReady, setAuthReady] = useState<boolean>(() => !supabase);
+  const [state, setState] = useState<PersistedState>(EMPTY_STATE);
+  const [authReady, setAuthReady] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const hydratedUserRef = useRef<string | null>(null);
+  const inflightHydrateRef = useRef<{ userId: string; promise: Promise<Profile | null> } | null>(null);
+  const clearSyncError = useCallback(() => setSyncError(null), []);
+
+  const runLiveTask = useCallback((task: () => Promise<void>) => {
+    void task().catch((err) => {
+      console.error('[LostLink] Live sync error:', err);
+      setSyncError(err instanceof Error ? err.message : 'Could not sync changes with Supabase.');
+    });
+  }, []);
 
   const currentUser = useMemo(
     () => state.profiles.find((p) => p.id === state.currentUserId) ?? null,
@@ -204,33 +210,79 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
 
   const hydrateUser = useCallback(async (userId: string, force = false): Promise<Profile | null> => {
     if (!supabase) return null;
-    if (!force && hydratedUserRef.current === userId) return null;
-    hydratedUserRef.current = userId;
-    try {
-      const { data: profileRow, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      if (error || !profileRow) {
-        hydratedUserRef.current = null;
-        setState(EMPTY_STATE);
-        return null;
+    if (!force) {
+      if (inflightHydrateRef.current?.userId === userId) {
+        return inflightHydrateRef.current.promise;
       }
-      const profile = mapProfile(profileRow as ProfileRow);
-      if (!profile.active) {
-        hydratedUserRef.current = null;
-        await supabase.auth.signOut();
-        setState(EMPTY_STATE);
-        return null;
+      if (hydratedUserRef.current === userId) {
+        return stateRef.current.profiles.find((p) => p.id === userId) ?? null;
       }
-      const snapshot = await fetchPortalSnapshot(supabase, profile);
-      setState({ currentUserId: profile.id, ...snapshot });
-      return profile;
-    } catch {
-      hydratedUserRef.current = null;
-      return null;
     }
+    hydratedUserRef.current = userId;
+    const promise = (async (): Promise<Profile | null> => {
+      try {
+        const { data: profileRow, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        if (hydratedUserRef.current !== userId) return null;
+        if (error || !profileRow) {
+          hydratedUserRef.current = null;
+          setState(EMPTY_STATE);
+          return null;
+        }
+        const profile = mapProfile(profileRow as ProfileRow);
+        if (!profile.active) {
+          hydratedUserRef.current = null;
+          await supabase.auth.signOut();
+          setState(EMPTY_STATE);
+          return null;
+        }
+        const snapshot = await fetchPortalSnapshot(supabase, profile);
+        if (hydratedUserRef.current !== userId) return null;
+        setState({ currentUserId: profile.id, ...snapshot });
+        return profile;
+      } catch {
+        if (hydratedUserRef.current === userId) hydratedUserRef.current = null;
+        return null;
+      }
+    })();
+    inflightHydrateRef.current = { userId, promise };
+    void promise.finally(() => {
+      if (inflightHydrateRef.current?.promise === promise) {
+        inflightHydrateRef.current = null;
+      }
+    });
+    return promise;
+  }, []);
+
+  const hydratePublic = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      const pub = await fetchPublicSnapshot(supabase);
+      // Only apply if still signed out so a racing sign-in is never overwritten.
+      if (hydratedUserRef.current !== null) return;
+      setState({ ...EMPTY_STATE, items: pub.items, broadcasts: pub.broadcasts });
+    } catch {
+      if (hydratedUserRef.current === null) setState(EMPTY_STATE);
+    }
+  }, []);
+
+  // Offline demo bootstrap: lazy-loads seedData only when Supabase env vars are absent.
+  useEffect(() => {
+    if (supabase) return;
+    let active = true;
+    void import('./seedData')
+      .then(({ INITIAL_DEMO_STATE }) => {
+        if (active) setState(loadDemoState(INITIAL_DEMO_STATE));
+      })
+      .finally(() => {
+        if (active) setAuthReady(true);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Live Supabase auth session bootstrap + listener
@@ -248,7 +300,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
           await hydrateUser(session.user.id);
         } else {
           hydratedUserRef.current = null;
-          setState(EMPTY_STATE);
+          await hydratePublic();
         }
       } catch {
         if (active) {
@@ -263,10 +315,13 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      // Initial session is already handled by getSession() above; skip duplicate fetch.
+      if (event === 'INITIAL_SESSION') return;
       if (event === 'SIGNED_OUT' || !session?.user) {
         hydratedUserRef.current = null;
-        setState(EMPTY_STATE);
-        setAuthReady(true);
+        void hydratePublic().finally(() => {
+          if (active) setAuthReady(true);
+        });
         return;
       }
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
@@ -280,17 +335,17 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
       active = false;
       subscription.unsubscribe();
     };
-  }, [hydrateUser]);
+  }, [hydrateUser, hydratePublic]);
 
-  // Persist demo state to localStorage ONLY when offline (never write live DB data locally)
+  // Persist demo state to localStorage ONLY when offline and hydrated (never write live DB data locally)
   useEffect(() => {
-    if (supabase) return;
+    if (supabase || !authReady) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // Ignore storage quota warnings in demo mode
     }
-  }, [state]);
+  }, [state, authReady]);
 
   // Live Realtime notifications & broadcasts subscription
   useEffect(() => {
@@ -372,7 +427,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
         if (error || !data.user) {
           return { ok: false, error: 'Invalid DLSAU email or password.' };
         }
-        const profile = await hydrateUser(data.user.id, true);
+        const profile = await hydrateUser(data.user.id);
         if (!profile) {
           return { ok: false, error: 'Account is suspended or missing a campus profile. Contact LSB Room 102.' };
         }
@@ -411,9 +466,8 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
   const signInDemoRole = useCallback((role: 'student' | 'admin') => {
     const targetId = role === 'admin' ? 'user-admin' : 'user-renee';
     const profiles = stateRef.current.profiles;
-    const user =
-      profiles.find((p) => p.id === targetId) ?? profiles[0] ?? INITIAL_DEMO_STATE.profiles[0];
-    setState((prev) => ({ ...prev, currentUserId: user.id }));
+    const user = profiles.find((p) => p.id === targetId) ?? profiles[0];
+    if (user) setState((prev) => ({ ...prev, currentUserId: user.id }));
     return user;
   }, []);
 
@@ -482,9 +536,15 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    setSyncError(null);
     if (supabase) {
       hydratedUserRef.current = null;
-      setState(EMPTY_STATE);
+      inflightHydrateRef.current = null;
+      setState((prev) => ({
+        ...EMPTY_STATE,
+        items: prev.items.filter((i) => i.status === 'approved').map((i) => (i.hidePhoto ? { ...i, images: [] } : i)),
+        broadcasts: prev.broadcasts.filter((b) => b.active),
+      }));
       try {
         await supabase.auth.signOut();
       } catch {
@@ -847,6 +907,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             .update({ status: 'approved', custody_note: note })
             .eq('id', itemId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -891,6 +952,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             .update({ status: 'rejected', reject_reason: cleanReason, custody_note: custodyNote })
             .eq('id', itemId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -927,6 +989,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             .update({ hide_photo: nextShield })
             .eq('id', itemId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -988,6 +1051,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             .update({ status: decision, denial_reason: decision === 'denied' ? cleanReason : null })
             .eq('id', claimId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -1046,6 +1110,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             .update({ custody_extended_until: nextUntil, custody_note: custodyNote })
             .eq('id', itemId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -1091,6 +1156,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             })
             .eq('id', itemId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -1169,6 +1235,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
         runLiveTask(async () => {
           const { error } = await client.from('broadcasts').delete().eq('id', id);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -1198,6 +1265,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
         runLiveTask(async () => {
           const { error } = await client.from('profiles').update({ role }).eq('id', userId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -1231,6 +1299,7 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
             .update({ active: nextActive })
             .eq('id', userId);
           if (error) {
+            setSyncError(error.message);
             await hydrateUser(admin.id, true);
             return;
           }
@@ -1310,6 +1379,8 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
       currentUser,
       authReady,
       isLiveBackend: Boolean(supabase),
+      syncError,
+      clearSyncError,
       signIn,
       signInDemoRole,
       registerAccount,
@@ -1340,6 +1411,8 @@ export function LostLinkProvider({ children }: { children: ReactNode }) {
       isAdmin,
       currentUser,
       authReady,
+      syncError,
+      clearSyncError,
       signIn,
       signInDemoRole,
       registerAccount,

@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { Toggletip, Tooltip } from '../components/InfoTip';
 import { StatusPill } from '../components/StatusPill';
 import { ValidationBubble } from '../components/ValidationBubble';
+import { initialsOf } from '../lib/constants';
 import { PROGRAMS_BY_COLLEGE, useLostLink } from '../lib/store';
 import { generateTempPassword } from '../lib/validation';
 import type { CollegeCode, UserRole } from '../types';
@@ -14,16 +15,6 @@ const COLLEGES: ('all' | CollegeCode)[] = [
   ...(Object.keys(PROGRAMS_BY_COLLEGE) as CollegeCode[]),
 ];
 const ALL_PROGRAMS = Object.values(PROGRAMS_BY_COLLEGE).flat();
-
-function initialsOf(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
 
 export function AdminUsersPage() {
   const {
