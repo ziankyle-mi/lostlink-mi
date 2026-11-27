@@ -94,24 +94,29 @@ export function LoginPage() {
             className="w-full max-w-[448px] rounded-xl border border-[var(--color-line-strong)] bg-white p-6 sm:p-8"
           >
             <div className="border-b border-[var(--color-line)] pb-5">
-              <Link
-                to="/"
-                className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                Back to LostLink
-              </Link>
-              {intentLabel && (
-                <p className="mb-3 inline-flex items-center rounded-md border border-[#c2dec9] bg-[#e7f3ea] px-2.5 py-1 font-mono text-xs font-medium text-[#15522b]">
-                  Next: {intentLabel}
-                </p>
-              )}
+              <div className="mb-3">
+                <Link
+                  to="/"
+                  className="-ml-1 inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-1 text-xs font-medium text-[#454545] transition-colors hover:text-[#1f6b3a]"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Back to LostLink</span>
+                </Link>
+              </div>
               <h1 id="login-heading" className="text-[26px] font-semibold leading-tight tracking-[-0.025em]">
                 Campus portal sign in
               </h1>
               <p className="mt-2 text-[15px] leading-normal text-[#454545]">
                 Use your @dlsau.edu.ph account to view campus holdings, file reports, or verify a claim.
               </p>
+              {intentLabel && (
+                <p
+                  role="status"
+                  className="mt-3 rounded-lg border border-[#c2dec9] bg-[#e7f3ea] px-3 py-2 text-[13px] font-medium text-[#15522b]"
+                >
+                  After sign-in: {intentLabel}
+                </p>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="mt-5 grid gap-4">
